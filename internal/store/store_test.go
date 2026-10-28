@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/razzie-cloud/files/internal/secrets"
 	"github.com/razzie-cloud/files/internal/store"
 	"github.com/razzie-cloud/files/internal/testutil"
 )
@@ -15,7 +16,11 @@ func TestOwnershipRevisionsAndPrefixes(t *testing.T) {
 	repo := &store.Store{DB: testutil.Database(t)}
 	ctx := context.Background()
 	alice, bob := uuid.NewString(), uuid.NewString()
-	c := store.Connection{Owner: alice, Name: "Storage", Provider: "Other", AccessMode: "writable", SecretRef: "secret"}
+	ref, err := secrets.New(repo.DB).Put(ctx, alice, secrets.Value{AccessKey: "key", SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := store.Connection{Owner: alice, Name: "Storage", Provider: "Other", AccessMode: "writable", SecretRef: ref}
 	if e := repo.SaveConnection(ctx, &c); e != nil {
 		t.Fatal(e)
 	}

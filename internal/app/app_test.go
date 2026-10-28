@@ -94,11 +94,7 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer proxy.Close()
-	secretStore, e := secrets.Open(t.TempDir())
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer secretStore.Close()
+	secretStore := secrets.New(repo.DB)
 	factory := &rclonestorage.Factory{ProxyURL: proxy.URL, Policy: policy, MaxEntries: 100}
 	cfg := config.Config{Origin: "http://files.localhost:8082", MaxUploads: 2, MaxUploadBytes: 1 << 20}
 	srv, e := New(cfg, repo, secretStore, factory, policy)

@@ -57,7 +57,7 @@ func translate(err error) error {
 }
 
 const connectionColumns = "id,owner_user_id,name,provider,endpoint,region,path_style,access_mode,secret_ref,revision"
-const directoryColumns = "id,owner_user_id,connection_id,name,bucket,prefix,read_only,encryption_mode,filename_encryption,directory_encryption,filename_encoding,suffix,crypt_secret_ref,revision"
+const directoryColumns = "id,owner_user_id,connection_id,name,bucket,prefix,read_only,encryption_mode,filename_encryption,directory_encryption,filename_encoding,suffix,COALESCE(crypt_secret_ref,''),revision"
 
 type scanner interface{ Scan(...any) error }
 
@@ -211,7 +211,7 @@ func (s *Store) SaveDirectory(ctx context.Context, d *Directory) error {
 		return ErrConflict
 	}
 	d.ID = uuid.NewString()
-	_, e = tx.ExecContext(ctx, `INSERT INTO directories(id,owner_user_id,connection_id,name,bucket,prefix,read_only,encryption_mode,filename_encryption,directory_encryption,filename_encoding,suffix,crypt_secret_ref) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, d.ID, d.Owner, d.ConnectionID, d.Name, d.Bucket, d.Prefix, d.ReadOnly, d.EncryptionMode, d.FilenameEncryption, d.DirectoryEncryption, d.FilenameEncoding, d.Suffix, d.CryptSecretRef)
+	_, e = tx.ExecContext(ctx, `INSERT INTO directories(id,owner_user_id,connection_id,name,bucket,prefix,read_only,encryption_mode,filename_encryption,directory_encryption,filename_encoding,suffix,crypt_secret_ref) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''))`, d.ID, d.Owner, d.ConnectionID, d.Name, d.Bucket, d.Prefix, d.ReadOnly, d.EncryptionMode, d.FilenameEncryption, d.DirectoryEncryption, d.FilenameEncoding, d.Suffix, d.CryptSecretRef)
 	if e != nil {
 		return translate(e)
 	}

@@ -2,7 +2,7 @@
 
 A private web file manager for S3-compatible storage, including Backblaze B2.
 Named directories map directly to a bucket and optional prefix. PostgreSQL stores
-configuration; object contents remain in S3. There is no local sync or mount.
+configuration and credentials; object contents remain in S3. There is no local sync or mount.
 
 The Go service embeds **rclone v1.75.2** as a library. It composes the S3 backend
 with optional rclone `crypt`, with no subprocess, RC API, or custom encryption.
@@ -51,7 +51,7 @@ Each environment variable also has a kebab-case CLI flag, for example
 | `POSTGRES_URI_FROM` | Normal deployment: `http://database-broker:8080/v1/instances/postgres/files/uri` |
 | `POSTGRES_URI` | Direct development/recovery override; set exactly one database option |
 | `POSTGRES_PASSWORD_FILE` | Optional file overriding the URI's password |
-| `SECRETS_DIR` | Required persistent private secret volume |
+| `IMPORT_SECRETS_DIR` | Optional one-time import of a legacy secret directory (`--import-secrets-dir`) |
 | `MAX_UPLOAD_BYTES` | Plaintext per-file limit, default 1 GiB |
 | `MAX_CONCURRENT_UPLOADS` | Per-process upload slots, default four |
 | `MAX_LIST_ENTRIES` | Entries collected per directory, default 10,000 |
@@ -119,24 +119,46 @@ browser uploads are outside this first release.
 
 ## Secret storage and recovery
 
-S3 credentials and crypt passwords are stored outside PostgreSQL as immutable
-owner-scoped files. The dedicated service user owns a 0700 directory and 0600 files.
-These permissions do not encrypt files. Use deployment-managed encrypted storage
-or a protected secret volume; there is no custom credential-encryption scheme.
+S3 credentials and rclone crypt passwords are immutable, owner-scoped records in
+PostgreSQL's `service_secrets` table. Connection and directory references have
+composite foreign keys that prevent cross-owner references. A PostgreSQL backup
+includes both configuration and recovery secrets; there is no runtime secret
+volume, host directory, or separately managed encryption key.
+
+Secret values are readable JSONB inside the service's database. No custom
+application encryption or reversible obscuring is presented as encryption at rest.
+Use the deployment's PostgreSQL storage/backup encryption if desired. Disclosure
+of this database includes the S3 credentials and crypt passwords. Rclone crypt
+still encrypts file objects in S3; it does not protect against database disclosure.
+
 Never render saved secrets into edit forms. Blank credential fields preserve
-existing values; clearing a session token is explicit.
+existing values; clearing a session token is explicit. Replacements create new
+records before updating configuration references. Old/unreferenced records are
+retained for in-flight requests and recovery after a mapping is removed. Deleting
+configuration never deletes remote objects or their recovery secrets. Clean up
+retained records only after confirming that the remote data is recoverable elsewhere.
 
-Secret replacements write/sync a new file before updating the database reference.
-Old/unreferenced files are retained to preserve in-flight requests and recovery
-after mapping deletion. Back up the PostgreSQL database and secret volume together.
-Retain recovery secrets until their associated remote data is safely recoverable
-elsewhere; do not delete orphan-looking files automatically. A failed metadata
-write can leave an unused secret file. Offline cleanup should compare references
-against a consistent database backup and the operator's crypt-recovery inventory.
+Replicas share PostgreSQL and need no shared files volume. Keep proxy-to-service
+identity trust enforced by network isolation; moving secrets into PostgreSQL does
+not change that separate boundary.
 
-Run one replica with a local secret volume. Multiple replicas require shared
-protected storage with consistent permissions and atomic file creation, and
-shared PostgreSQL. Keep storage anchored to its node until this is configured.
+### Upgrading an existing file-backed installation
+
+Stop the old files instances and back up their database and secret volume. Start
+one new instance with the old volume mounted **read-only**, and set
+`IMPORT_SECRETS_DIR` to that mount path (or use `--import-secrets-dir`). The new
+migration creates the database store while retaining existing reference IDs.
+Startup imports every record, including retained recovery passwords, in a single
+transaction and validates the references before listening. Missing files, malformed
+records, or conflicts fail startup without committing a partial import or printing
+secret values. Repeating the import is safe and never overwrites an existing value.
+
+After successful import, remove the import option and legacy volume mount and
+restart normally. Keep the old backup until the new database backup and recovery
+paths are verified; the importer never deletes or changes the old files. Fresh
+installations do not need this step. `SECRETS_DIR` and `--secrets-dir` are no longer
+runtime configuration options. Rolling back to the old binary requires its original
+secret volume as well as the appropriate database backup.
 
 ## Development and checks
 
@@ -161,11 +183,12 @@ TEST_DATABASE_URL='postgres://files_test:LOCAL_PASSWORD@127.0.0.1:55432/files_te
 Without `TEST_DATABASE_URL`, PostgreSQL and HTTP workflow integration tests skip.
 They require loopback and create/drop random schemas. Other tests run real rclone
 against a test S3 HTTP server and check crypt bytes, range reads, wrong keys,
-paths, identity, read-only enforcement, secret persistence, and discovery failures.
+paths, identity, read-only enforcement, database secret persistence, legacy imports,
+and discovery failures.
 Tests use no production Docker context or cloud credentials.
 
 Build the standalone image with `docker build -t files:local .`. The runtime runs
-as UID/GID 10001. Ensure a bind-mounted secret directory is owned by that user.
+as UID/GID 10001 and needs no writable persistent filesystem volume.
 The CI workflow runs build, vet, race tests with disposable PostgreSQL, and an
 image build. Images and this repository must be published separately before
 publishing a parent pointer or deploying a Swarm release.

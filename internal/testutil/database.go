@@ -17,6 +17,17 @@ import (
 
 func Database(t *testing.T) *sql.DB {
 	t.Helper()
+	database := EmptyDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := db.Migrate(ctx, database); err != nil {
+		t.Fatal(err)
+	}
+	return database
+}
+
+func EmptyDatabase(t *testing.T) *sql.DB {
+	t.Helper()
 	raw := os.Getenv("TEST_DATABASE_URL")
 	if raw == "" {
 		t.Skip("set TEST_DATABASE_URL to a disposable local PostgreSQL backend")
@@ -45,10 +56,5 @@ func Database(t *testing.T) *sql.DB {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { database.Close(); admin.Exec("DROP SCHEMA " + schema + " CASCADE"); admin.Close() })
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if e = db.Migrate(ctx, database); e != nil {
-		t.Fatal(e)
-	}
 	return database
 }

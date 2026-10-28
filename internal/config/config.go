@@ -16,11 +16,11 @@ import (
 )
 
 type Config struct {
-	Port, Origin, PostgresURI, PostgresURIFrom, PasswordFile, SecretsDir string
-	PrivateEndpoints                                                     string
-	AllowHTTP                                                            bool
-	MaxUploadBytes                                                       int64
-	MaxUploads, MaxEntries                                               int
+	Port, Origin, PostgresURI, PostgresURIFrom, PasswordFile, ImportSecretsDir string
+	PrivateEndpoints                                                           string
+	AllowHTTP                                                                  bool
+	MaxUploadBytes                                                             int64
+	MaxUploads, MaxEntries                                                     int
 }
 
 func Load(args []string, env func(string) string) (Config, error) {
@@ -39,7 +39,7 @@ func Load(args []string, env func(string) string) (Config, error) {
 	str(&c.PostgresURI, "postgres-uri", "POSTGRES_URI", "")
 	str(&c.PostgresURIFrom, "postgres-uri-from", "POSTGRES_URI_FROM", "")
 	str(&c.PasswordFile, "postgres-password-file", "POSTGRES_PASSWORD_FILE", "")
-	str(&c.SecretsDir, "secrets-dir", "SECRETS_DIR", "")
+	str(&c.ImportSecretsDir, "import-secrets-dir", "IMPORT_SECRETS_DIR", "")
 	str(&c.PrivateEndpoints, "s3-allowed-private-endpoints", "S3_ALLOWED_PRIVATE_ENDPOINTS", "")
 	num := func(key string, fallback int64) (int64, error) {
 		if v := env(key); v != "" {
@@ -87,8 +87,8 @@ func Load(args []string, env func(string) string) (Config, error) {
 	if (c.PostgresURI == "") == (c.PostgresURIFrom == "") {
 		return c, errors.New("set exactly one of POSTGRES_URI and POSTGRES_URI_FROM")
 	}
-	if c.SecretsDir == "" || c.MaxUploadBytes < 1 || c.MaxUploadBytes > 1<<40 || c.MaxUploads < 1 || c.MaxUploads > 64 || c.MaxEntries < 1 || c.MaxEntries > 100000 {
-		return c, errors.New("set SECRETS_DIR and valid transfer/listing limits")
+	if c.MaxUploadBytes < 1 || c.MaxUploadBytes > 1<<40 || c.MaxUploads < 1 || c.MaxUploads > 64 || c.MaxEntries < 1 || c.MaxEntries > 100000 {
+		return c, errors.New("set valid transfer/listing limits")
 	}
 	return c, nil
 }

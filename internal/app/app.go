@@ -272,7 +272,7 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, store.ErrConflict, 409)
 			return
 		}
-		credentials, e = s.Secrets.Get(owner, c.SecretRef)
+		credentials, e = s.Secrets.Get(r.Context(), owner, c.SecretRef)
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
@@ -313,7 +313,7 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errors.New("Access key and secret key are required."), 422)
 		return
 	}
-	ref, e := s.Secrets.Put(owner, credentials)
+	ref, e := s.Secrets.Put(r.Context(), owner, credentials)
 	if e != nil {
 		s.fail(w, r, e, 500)
 		return
@@ -399,7 +399,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, errors.New("Enter a crypt password and valid crypt options."), 422)
 			return
 		}
-		credentials, e := s.Secrets.Get(owner, c.SecretRef)
+		credentials, e := s.Secrets.Get(r.Context(), owner, c.SecretRef)
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
@@ -445,7 +445,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		ref, e := s.Secrets.Put(owner, keys)
+		ref, e := s.Secrets.Put(r.Context(), owner, keys)
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
@@ -484,13 +484,13 @@ func (s *Server) open(r *http.Request, write bool) (store.Directory, store.Conne
 	if write && !d.Writable(c) {
 		return d, c, nil, errReadOnly
 	}
-	credentials, e := s.Secrets.Get(d.Owner, c.SecretRef)
+	credentials, e := s.Secrets.Get(r.Context(), d.Owner, c.SecretRef)
 	if e != nil {
 		return d, c, nil, e
 	}
 	keys := secrets.Value{}
 	if d.EncryptionMode == "rclone_crypt" {
-		keys, e = s.Secrets.Get(d.Owner, d.CryptSecretRef)
+		keys, e = s.Secrets.Get(r.Context(), d.Owner, d.CryptSecretRef)
 		if e != nil {
 			return d, c, nil, e
 		}
@@ -581,7 +581,7 @@ func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 422)
 		return
 	}
-	credentials, e := s.Secrets.Get(c.Owner, c.SecretRef)
+	credentials, e := s.Secrets.Get(r.Context(), c.Owner, c.SecretRef)
 	if e != nil {
 		s.fail(w, r, e, 500)
 		return

@@ -46,11 +46,15 @@ func run() error {
 	if e = db.Migrate(startup, database); e != nil {
 		return sanitized("database migration failed")
 	}
-	secretStore, e := secrets.Open(cfg.SecretsDir)
-	if e != nil {
-		return sanitized("secret storage unavailable")
+	secretStore := secrets.New(database)
+	if cfg.ImportSecretsDir != "" {
+		if e = secretStore.Import(startup, cfg.ImportSecretsDir); e != nil {
+			return e
+		}
 	}
-	defer secretStore.Close()
+	if e = secretStore.Ready(startup); e != nil {
+		return e
+	}
 	policy, e := rclonestorage.NewPolicy(cfg.PrivateEndpoints, cfg.AllowHTTP)
 	if e != nil {
 		return e

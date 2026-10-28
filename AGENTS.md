@@ -14,8 +14,10 @@ frontend build pipeline. Keep CSP-compatible settings and escaped templates.
 User identity comes only from proxy-supplied X-Auth-Request-User UUIDs. Every
 metadata lookup is owner-scoped. Public traffic must pass through the gateway.
 Enforce read-only access before opening storage, and recheck after write locks.
-Keep secrets out of PostgreSQL, rendered forms, and logs. Retain crypt recovery
-secrets when deleting mappings. Config deletion must never remove S3 objects.
+Store secrets as owner-scoped PostgreSQL records; keep them out of rendered forms
+and logs. Retain crypt recovery secrets when deleting mappings. Config deletion
+must never remove S3 objects. Runtime needs no secret directory or encryption key.
+Keep the read-only legacy importer transactional and never overwrite/delete old files.
 
 Run `gofmt`, `go build ./...`, `go vet ./...`, `go test ./...`, and
 `go test -race ./...`. Tests start in-memory S3 HTTP servers. PostgreSQL tests

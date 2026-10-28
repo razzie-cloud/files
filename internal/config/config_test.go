@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoadValidation(t *testing.T) {
-	base := map[string]string{"ORIGIN": "https://files.example.com", "POSTGRES_URI": "postgres://u:p@localhost/files", "SECRETS_DIR": t.TempDir()}
+	base := map[string]string{"ORIGIN": "https://files.example.com", "POSTGRES_URI": "postgres://u:p@localhost/files"}
 	if _, e := Load(nil, func(k string) string { return base[k] }); e != nil {
 		t.Fatal(e)
 	}
