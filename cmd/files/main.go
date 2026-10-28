@@ -69,14 +69,24 @@ func run() error {
 		return sanitized("template initialization failed")
 	}
 	httpServer := &http.Server{Addr: cfg.Address(), Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		httpServer.Shutdown(shutdown)
+		if httpServer.Shutdown(shutdown) != nil {
+			httpServer.Close()
+		}
 	}()
 	log.Printf("files listening on %s", cfg.Address())
 	e = httpServer.ListenAndServe()
+	if e != http.ErrServerClosed {
+		stop()
+	}
+	// ListenAndServe returns when the listener closes, before Shutdown has
+	// finished draining requests. Keep storage/database dependencies alive.
+	<-shutdownDone
 	if e == http.ErrServerClosed {
 		return nil
 	}
