@@ -91,7 +91,11 @@ Live Backblaze compatibility needs acceptance testing with your disposable keys;
 the automated suite runs against an in-memory S3 implementation.
 
 When using crypt, uploads encrypt and downloads decrypt automatically through
-rclone. Set the encryption password, optional salt password, filename encryption,
+rclone. In **Add directory → Encryption → rclone crypt**, set **Encryption
+password (rclone password)** and **Salt password (rclone password2, optional)**.
+These belong to the directory, rather than the storage connection. Enter the
+original passwords, before rclone obscures them for its config file; leave
+password2 empty if the remote has no salt password. Set filename encryption
 and matching advanced settings if attaching an existing rclone directory. An
 existing encrypted prefix requires a known non-empty decrypted file path to verify the key;
 a new prefix must be empty. Plain and crypt data must use separate prefixes.
