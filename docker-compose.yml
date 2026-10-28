@@ -1,0 +1,22 @@
+# Disposable dependencies for running Go integration tests outside the parent.
+name: files-dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: files_test
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Set TEST_POSTGRES_PASSWORD}
+      POSTGRES_DB: files_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+  s3-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-s3
+      network: host
+    environment:
+      S3_DEV_PASSWORD: ${TEST_S3_PASSWORD:?Set TEST_S3_PASSWORD}
+    ports:
+      - "127.0.0.1:59000:9000"

@@ -1,0 +1,70 @@
+{{define "page"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
+<title>Files · Razcloud</title><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css">
+<script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script></head>
+<body><header class="container"><nav><ul><li><a href="/" class="brand">Razcloud <strong>Files</strong></a></li></ul><ul><li><a href="/connections">Storage connections</a></li><li>{{.User.Name}}</li></ul></nav></header>
+<main id="main" class="container">{{template "content" .}}</main><footer class="container"><small>Private storage. Your files stay in your buckets.</small></footer></body></html>{{end}}
+
+{{define "error"}}<article role="alert"><h2>Unable to complete the request</h2><p>{{.}}</p><p><button type="button" class="secondary" data-back>Return to the previous page</button> <a href="/">Directories</a></p></article>{{end}}
+
+{{define "content"}}
+{{if eq .Page "error"}}{{template "error" .Message}}{{end}}
+{{if eq .Page "home"}}
+<div class="heading"><div><small>YOUR STORAGE</small><h1>Directories</h1><p>One place for your S3-backed folders.</p></div><a role="button" href="/directories/new">Add directory</a></div>
+{{if .Directories}}<div class="cards">{{range .Directories}}<article><h2><a href="/directories/{{.ID}}">{{.Name}}</a></h2><p><span class="badge">{{if eq .EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span>{{if .ReadOnly}} <span class="badge">Read-only</span>{{end}}</p><small>{{.Bucket}}{{if .Prefix}} / {{.Prefix}}{{end}}</small><footer><a href="/directories/{{.ID}}">Open directory →</a> <a href="/directories/{{.ID}}/edit">Settings</a></footer></article>{{end}}</div>
+{{else}}<article class="empty"><h2>Your storage, connected</h2><p>Add a storage connection, then choose a bucket and prefix for your first directory.</p><a href="/connections" role="button">Connect storage</a></article>{{end}}
+{{end}}
+
+{{if eq .Page "connections"}}
+<div class="heading"><div><small>SETTINGS</small><h1>Storage connections</h1><p>Bring an S3-compatible provider, including Backblaze B2.</p></div><a href="/">Directories</a></div>
+<div class="settings"><section>{{range .Connections}}<article><h2>{{.Name}}</h2><p><span class="badge">{{.Provider}}</span> <span class="badge">{{if eq .AccessMode "writable"}}Writable{{else}}Read-only{{end}}</span></p><small>{{.Endpoint}}</small><p><a href="/connections/{{.ID}}/edit">Edit connection</a></p>
+<details><summary>Test bucket access</summary><form method="post" action="/connections/{{.ID}}/test" hx-post="/connections/{{.ID}}/test" hx-target="#main"><label>Bucket<input name="bucket" required></label><label>Prefix (optional)<input name="prefix"></label><button>Test listing</button><small>This check never writes to your bucket.</small></form></details>
+<details><summary>Remove connection</summary><p>Remove its directory configurations first. Objects and retained recovery secrets are kept.</p><form method="post" action="/connections/{{.ID}}/remove" hx-post="/connections/{{.ID}}/remove" hx-target="#main"><input type="hidden" name="revision" value="{{.Revision}}"><button class="secondary">Remove unused connection</button></form></details></article>{{else}}<p>No storage connections yet.</p>{{end}}</section>
+{{with .Connection}}<article><h2>{{if .ID}}Edit {{.Name}}{{else}}Connect storage{{end}}</h2>
+<form method="post" action="{{if .ID}}/connections/{{.ID}}/update{{else}}/connections{{end}}" hx-post="{{if .ID}}/connections/{{.ID}}/update{{else}}/connections{{end}}" hx-target="#main">
+<input type="hidden" name="revision" value="{{.Revision}}">
+<label>Name<input name="name" value="{{.Name}}" maxlength="80" required autocomplete="off"></label>
+<label>Provider<select name="provider"><option value="Other" {{if eq .Provider "Other"}}selected{{end}}>Custom S3-compatible</option><option value="Backblaze" {{if eq .Provider "Backblaze"}}selected{{end}}>Backblaze B2 (S3 API)</option><option value="AWS" {{if eq .Provider "AWS"}}selected{{end}}>Amazon S3</option></select></label>
+<label>Endpoint<input name="endpoint" type="url" value="{{.Endpoint}}" placeholder="https://s3.us-west-002.backblazeb2.com"></label><small>Use your bucket's actual regional S3 endpoint. AWS may leave this blank.</small>
+<label>Signing region<input name="region" value="{{.Region}}" placeholder="us-west-002" maxlength="100"></label>
+<label>Access key ID<input name="access_key" autocomplete="off" {{if not .ID}}required{{end}}></label>
+<label>Secret key<input name="secret_key" type="password" autocomplete="new-password" {{if not .ID}}required{{end}}></label>
+<label>Session token (optional)<input name="session_token" type="password" autocomplete="new-password"></label>{{if .ID}}<small>Leave credential fields empty to keep their current values.</small><label><input type="checkbox" name="clear_session_token">Clear saved session token</label>{{end}}
+<label>Access mode<select name="access_mode" required><option value="read_only" {{if eq .AccessMode "read_only"}}selected{{end}}>Read-only</option><option value="writable" {{if eq .AccessMode "writable"}}selected{{end}}>Writable</option></select></label><small>Files enforces this policy even if your provider credentials allow more.</small>
+<label><input type="checkbox" name="path_style" {{if .PathStyle}}checked{{end}}>Use path-style bucket addressing</label><button>Save connection</button></form></article>{{end}}</div>
+{{end}}
+
+{{if eq .Page "directory-form"}}
+<div class="heading"><div><small>DIRECTORY SETTINGS</small><h1>{{if .Directory.ID}}Edit directory{{else}}Add directory{{end}}</h1></div><a href="/">Directories</a></div>
+{{with .Directory}}<article class="form-card"><form method="post" action="{{if .ID}}/directories/{{.ID}}/update{{else}}/directories{{end}}" hx-post="{{if .ID}}/directories/{{.ID}}/update{{else}}/directories{{end}}" hx-target="#main">
+<input name="revision" type="hidden" value="{{.Revision}}"><label>Name<input name="name" value="{{.Name}}" required maxlength="80"></label>
+{{if not .ID}}<label>Storage connection<select name="connection_id" required><option value="">Choose a connection</option>{{range $.Connections}}<option value="{{.ID}}">{{.Name}} · {{.AccessMode}}</option>{{end}}</select></label><p><a href="/connections">Manage storage connections</a></p>
+<label>Bucket<input name="bucket" required></label><label>Prefix (optional)<input name="prefix" placeholder="documents/personal"></label>
+<label>Encryption<select name="encryption_mode" data-encryption><option value="none">Plain S3</option><option value="rclone_crypt">rclone crypt</option></select></label>
+<fieldset data-crypt><legend>rclone crypt settings</legend><p>Used only when rclone crypt is selected. Files encrypts uploads and decrypts downloads on the server.</p>
+<label>Encryption password<input type="password" name="crypt_password" autocomplete="new-password"></label><label>Salt password (optional)<input type="password" name="crypt_password2" autocomplete="new-password"></label>
+<label>Filename encryption<select name="filename_encryption"><option value="standard">Standard (encrypted)</option><option value="off">Off (keep names, add suffix)</option></select></label><label><input type="checkbox" name="directory_encryption" checked>Encrypt directory names</label>
+<details><summary>Advanced compatibility options</summary><label>Filename encoding<select name="filename_encoding"><option value="base32">base32</option><option value="base64">base64</option><option value="base32768">base32768</option></select></label><label>Suffix when filename encryption is off<input name="suffix" value=".bin"></label></details>
+<label>Known decrypted file path<input name="verify_path" placeholder="example.txt"></label><small>Use a non-empty encrypted file when attaching existing data, to verify your password.</small>
+<label><input type="checkbox" name="new_crypt_prefix">Initialize a new empty encrypted prefix instead</label><p><strong>Keep a separate copy of these passwords and settings.</strong> Changing them later does not re-encrypt existing objects.</p></fieldset>
+{{else}}<p>Backing location: {{.Bucket}} / {{.Prefix}}</p><p>{{if eq .EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}. Backing location and encryption settings are fixed. Create a separate mapping to change them.</p>{{end}}
+<label><input name="read_only" type="checkbox" {{if .ReadOnly}}checked{{end}}>Restrict this directory to read-only</label><small>A read-only storage connection always takes precedence.</small><button>Save directory</button></form>
+{{if .ID}}<details><summary>Remove directory configuration</summary><p>Remote files and crypt recovery secrets are retained.</p><form method="post" action="/directories/{{.ID}}/remove" hx-post="/directories/{{.ID}}/remove" hx-target="#main"><input type="hidden" name="revision" value="{{.Revision}}"><button class="secondary">Remove configuration</button></form></details>{{end}}</article>{{end}}
+{{end}}
+
+{{if eq .Page "browse"}}
+<div class="heading"><div><small>{{.Directory.Bucket}}</small><h1>{{.Directory.Name}}</h1><span class="badge">{{if .Writable}}Writable{{else}}Read-only{{end}}</span> <span class="badge">{{if eq .Directory.EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span></div><a href="/directories/{{.Directory.ID}}/edit">Directory settings</a></div>
+<nav aria-label="Breadcrumb"><ul><li><a href="/">Directories</a></li>{{range .Crumbs}}<li><a href="{{.URL}}">{{.Name}}</a></li>{{end}}</ul></nav>
+{{if .Writable}}<div class="actions"><details><summary role="button">Upload file</summary><article>
+<p>Destination: {{.Directory.Name}} / {{.Path}}<br>{{if eq .Directory.EncryptionMode "rclone_crypt"}}Encrypted automatically using this directory's rclone crypt settings.{{else}}Stored without rclone encryption.{{end}} Maximum {{size .UploadLimit}}.</p>
+<form method="post" enctype="multipart/form-data" action="/directories/{{.Directory.ID}}/upload?path={{q .Path}}&amp;revision={{.Directory.Revision}}" hx-post="/directories/{{.Directory.ID}}/upload?path={{q .Path}}&amp;revision={{.Directory.Revision}}" hx-encoding="multipart/form-data" hx-target="#main" data-upload><label>File<input type="file" name="file" required></label><progress value="0" max="100" hidden></progress><button>Upload file</button><button type="button" class="secondary" data-cancel-upload>Cancel upload</button></form>
+<details><summary>Replace an existing file</summary><p>Replacement writes to the same object key. Another storage client can also change it. Provider versioning determines recovery.</p><form method="post" enctype="multipart/form-data" action="/directories/{{.Directory.ID}}/upload?path={{q .Path}}&amp;revision={{.Directory.Revision}}&amp;replace=yes" hx-post="/directories/{{.Directory.ID}}/upload?path={{q .Path}}&amp;revision={{.Directory.Revision}}&amp;replace=yes" hx-encoding="multipart/form-data" hx-target="#main" data-upload><label>Replacement file<input type="file" name="file" required></label><label><input type="checkbox" required>I confirm replacing the object with this filename.</label><progress value="0" max="100" hidden></progress><button>Replace file</button></form></details></article></details>
+<details><summary>New folder</summary><form method="post" action="/directories/{{.Directory.ID}}/mkdir" hx-post="/directories/{{.Directory.ID}}/mkdir" hx-target="#main"><input type="hidden" name="revision" value="{{.Directory.Revision}}"><label>Relative folder path<input name="path" value="{{if .Path}}{{.Path}}/{{end}}" required placeholder="new-folder"></label><button>Create folder</button></form></details></div>{{end}}
+<div class="overflow-auto"><table><thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead><tbody>{{if .Parent}}<tr><td><a href="{{.Parent}}">↑ Parent directory</a></td><td></td><td></td></tr>{{end}}
+{{range .Entries}}<tr><td>{{if .Directory}}<a href="/directories/{{$.Directory.ID}}?path={{q .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td>{{if not .Directory}}<a href="/directories/{{$.Directory.ID}}/download?path={{q .Path}}">Download</a>{{end}}
+{{if $.Writable}}<details><summary>{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</summary><form method="post" action="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-post="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-target="#main"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="revision" value="{{$.Directory.Revision}}"><label><input type="checkbox" name="confirm" required>Confirm {{.Name}}</label><button class="secondary">{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</button></form></details>{{end}}</td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}</tbody></table></div>
+<nav aria-label="Pages"><ul>{{if .Previous}}<li><a href="{{.Previous}}">← Previous</a></li>{{end}}</ul><ul>{{if .Next}}<li><a href="{{.Next}}">Next →</a></li>{{end}}</ul></nav>
+{{end}}
+{{if eq .Page "message"}}<article role="status"><p>{{.Message}}</p><a href="/">Directories</a> · <a href="/connections">Storage connections</a></article>{{end}}
+{{end}}

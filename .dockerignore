@@ -1,0 +1,6 @@
+.git
+.env*
+secrets
+data
+files
+coverage.out

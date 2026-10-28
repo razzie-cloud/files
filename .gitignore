@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+/files
+/secrets/
+/data/
+coverage.out
