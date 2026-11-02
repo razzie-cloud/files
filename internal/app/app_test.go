@@ -174,11 +174,26 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			if rec := upload(); rec.Code != 409 {
 				t.Fatalf("unconfirmed overwrite: %d", rec.Code)
 			}
-			rec := request("GET", base+"/download?path="+url.QueryEscape("hello + %.txt"), nil, testOwner)
+			listing := request("GET", base, nil, testOwner)
+			if listing.Code != 200 {
+				t.Fatalf("browse after upload: %d %s", listing.Code, listing.Body.String())
+			}
+			// Follow the rendered link, as a browser does, so template URL
+			// encoding is covered along with storage reads and decryption.
+			downloadURL := ""
+			for _, u := range pageURLs(t, listing.Body.String(), "a", "href") {
+				if u.Path == base+"/download" {
+					downloadURL = u.String()
+				}
+			}
+			if downloadURL == "" {
+				t.Fatal("missing download link")
+			}
+			rec := request("GET", downloadURL, nil, testOwner)
 			if rec.Code != 200 || !bytes.Equal(rec.Body.Bytes(), content) {
 				t.Fatalf("download %d length %d", rec.Code, rec.Body.Len())
 			}
-			rangeRequest := httptest.NewRequest("GET", base+"/download?path="+url.QueryEscape("hello + %.txt"), nil)
+			rangeRequest := httptest.NewRequest("GET", downloadURL, nil)
 			rangeRequest.Header.Set("X-Auth-Request-User", testOwner)
 			rangeRequest.Header.Set("Range", "bytes=65000-66000")
 			ranged := httptest.NewRecorder()

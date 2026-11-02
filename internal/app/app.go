@@ -55,7 +55,7 @@ type view struct {
 }
 
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
-	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "q": url.QueryEscape, "base": path.Base}).ParseFS(web.Assets, "templates.html")
+	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base}).ParseFS(web.Assets, "templates.html")
 	if e != nil {
 		return nil, e
 	}
