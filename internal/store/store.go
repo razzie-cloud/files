@@ -32,6 +32,10 @@ func (d Directory) Writable(c Connection) bool { return c.AccessMode == "writabl
 
 type Repository interface {
 	Ping(context.Context) error
+	Shares(context.Context, string, string) ([]Share, error)
+	PublicShare(context.Context, string) (Share, error)
+	CreateShare(context.Context, *Share) error
+	RemoveShare(context.Context, string, string, string) error
 	Connections(context.Context, string) ([]Connection, error)
 	Connection(context.Context, string, string) (Connection, error)
 	SaveConnection(context.Context, *Connection) error

@@ -27,17 +27,21 @@ import (
 	rclonestorage "github.com/razzie-cloud/files/internal/storage/rclone"
 	"github.com/razzie-cloud/files/internal/store"
 	"github.com/razzie-cloud/files/internal/web"
+	"golang.org/x/time/rate"
 )
 
 type Server struct {
-	Config    config.Config
-	Repo      store.Repository
-	Secrets   *secrets.Store
-	Storage   storage.Factory
-	Policy    *rclonestorage.Policy
-	templates *template.Template
-	uploads   chan struct{}
-	health    *health.Monitor
+	Config        config.Config
+	Repo          store.Repository
+	Secrets       *secrets.Store
+	Storage       storage.Factory
+	Policy        *rclonestorage.Policy
+	templates     *template.Template
+	uploads       chan struct{}
+	health        *health.Monitor
+	shares        shareCache
+	passwordSlots chan struct{}
+	passwordRate  *rate.Limiter
 }
 type userKey struct{}
 type crumb struct{ Name, URL string }
@@ -52,6 +56,11 @@ type view struct {
 	Crumbs                                      []crumb
 	Writable                                    bool
 	UploadLimit                                 int64
+	ShareEnabled                                bool
+	Public                                      bool
+	ShareDirectory                              bool
+	Shares                                      []store.Share
+	ShareURL                                    string
 }
 
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
@@ -60,6 +69,7 @@ func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, f
 		return nil, e
 	}
 	return &Server{Config: cfg, Repo: repo, Secrets: secretStore, Storage: factory, Policy: policy, templates: t, uploads: make(chan struct{}, cfg.MaxUploads),
+		passwordSlots: make(chan struct{}, 2), passwordRate: rate.NewLimiter(2, 5),
 		health: health.New(health.Check{Name: "postgres", Ping: func(ctx context.Context) error { return repo.Ping(ctx) }})}, nil
 }
 
@@ -103,6 +113,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /directories/{id}/mkdir", s.mutate)
 	mux.HandleFunc("POST /directories/{id}/delete-file", s.mutate)
 	mux.HandleFunc("POST /directories/{id}/rmdir", s.mutate)
+	mux.HandleFunc("GET /directories/{id}/shares", s.shareForm)
+	mux.HandleFunc("POST /directories/{id}/shares", s.createShare)
+	mux.HandleFunc("POST /directories/{id}/shares/{share}/remove", s.removeShare)
+	public := s.publicHandler()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.health.Handle(w, r) {
 			return
@@ -115,6 +129,25 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				if recovered == http.ErrAbortHandler {
+					panic(recovered)
+				}
+				log.Printf("request %s failed", requestID)
+				http.Error(w, "Request failed", 500)
+			}
+		}()
+		// Select public routes by the actual Host, never by forwarded identity.
+		if s.Config.ShareOrigin != "" && sameHost(r.Host, s.Config.ShareOrigin) {
+			public.ServeHTTP(w, r)
+			return
+		}
+		// The management origin cannot serve public capabilities.
+		if strings.HasPrefix(r.URL.Path, "/s/") {
+			http.NotFound(w, r)
+			return
+		}
 		user, e := identity.FromRequest(r)
 		if e != nil {
 			http.Error(w, "Verified proxy identity required", 401)
@@ -140,22 +173,19 @@ func (s *Server) Handler() http.Handler {
 			ctx, cancel = context.WithTimeout(ctx, 45*time.Second)
 			defer cancel()
 		}
-		defer func() {
-			if recovered := recover(); recovered != nil {
-				if recovered == http.ErrAbortHandler {
-					panic(recovered)
-				}
-				log.Printf("request %s failed", requestID)
-				http.Error(w, "Request failed", 500)
-			}
-		}()
+
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-func user(r *http.Request) identity.User { return r.Context().Value(userKey{}).(identity.User) }
+func user(r *http.Request) identity.User {
+	u, _ := r.Context().Value(userKey{}).(identity.User)
+	return u
+}
 func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 	v.User = user(r)
 	v.UploadLimit = s.Config.MaxUploadBytes
+	v.ShareEnabled = s.Config.ShareOrigin != ""
+	v.Public = v.ShareEnabled && sameHost(r.Host, s.Config.ShareOrigin)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	name := "page"
 	if r.Header.Get("HX-Request") == "true" {
@@ -312,6 +342,7 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	s.shares.invalidate()
 	s.done(w, r, "/connections")
 }
 func (s *Server) removeConnection(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +354,7 @@ func (s *Server) removeConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	s.shares.invalidate()
 	s.done(w, r, "/connections")
 }
 func (s *Server) directoryForm(w http.ResponseWriter, r *http.Request) {
@@ -363,6 +395,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, e, 500)
 			return
 		}
+		s.shares.invalidate()
 		s.done(w, r, "/")
 		return
 	}
@@ -448,6 +481,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	s.shares.invalidate()
 	s.done(w, r, "/")
 }
 func (s *Server) removeDirectory(w http.ResponseWriter, r *http.Request) {
@@ -459,6 +493,7 @@ func (s *Server) removeDirectory(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	s.shares.invalidate()
 	s.done(w, r, "/")
 }
 func (s *Server) open(r *http.Request, write bool) (store.Directory, store.Connection, storage.FS, error) {
@@ -802,6 +837,10 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 422)
 		return
 	}
+	s.serveDownload(w, r, fs, key)
+}
+
+func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storage.FS, key string) {
 	info, e := fs.Stat(r.Context(), key)
 	if e != nil {
 		s.operationError(w, r, e)
@@ -838,6 +877,9 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
 	if partial {
 		w.WriteHeader(206)
+	}
+	if r.Method == http.MethodHead {
+		return
 	}
 	if _, e = io.CopyN(w, in, length); e != nil {
 		log.Print("download interrupted")

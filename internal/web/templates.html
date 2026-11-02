@@ -3,13 +3,13 @@
 <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
 <title>Files · Razcloud</title><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css">
 <script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script></head>
-<body><header class="container"><nav><ul><li><a href="/" class="brand">Razcloud <strong>Files</strong></a></li></ul><ul><li><a href="/connections">Storage connections</a></li><li>{{.User.Name}}</li></ul></nav></header>
-<main id="main" class="container">{{template "content" .}}</main><footer class="container"><small>Private storage. Your files stay in your buckets.</small></footer></body></html>{{end}}
+<body><header class="container"><nav><ul><li>{{if .Public}}Razcloud <strong>Shared files</strong>{{else}}<a href="/" class="brand">Razcloud <strong>Files</strong></a>{{end}}</li></ul>{{if not .Public}}<ul><li><a href="/connections">Storage connections</a></li><li>{{.User.Name}}</li></ul>{{end}}</nav></header>
+<main id="main" class="container">{{template "content" .}}</main><footer class="container"><small>{{if .Public}}Shared read-only access.{{else}}Private storage. Your files stay in your buckets.{{end}}</small></footer></body></html>{{end}}
 
 {{define "error"}}<article role="alert"><h2>Unable to complete the request</h2><p>{{.}}</p><p><button type="button" class="secondary" data-back>Return to the previous page</button> <a href="/">Directories</a></p></article>{{end}}
 
 {{define "content"}}
-{{if eq .Page "error"}}{{template "error" .Message}}{{end}}
+{{if eq .Page "error"}}{{if .Public}}<article role="alert"><h2>Unable to complete the request</h2><p>{{.Message}}</p></article>{{else}}{{template "error" .Message}}{{end}}{{end}}
 {{if eq .Page "home"}}
 <div class="heading"><div><small>YOUR STORAGE</small><h1>Directories</h1><p>One place for your S3-backed folders.</p></div><a role="button" href="/directories/new">Add directory</a></div>
 {{if .Directories}}<div class="cards">{{range .Directories}}<article><h2><a href="/directories/{{.ID}}">{{.Name}}</a></h2><p><span class="badge">{{if eq .EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span>{{if .ReadOnly}} <span class="badge">Read-only</span>{{end}}</p><small>{{.Bucket}}{{if .Prefix}} / {{.Prefix}}{{end}}</small><footer><a href="/directories/{{.ID}}">Open directory →</a> <a href="/directories/{{.ID}}/edit">Settings</a></footer></article>{{end}}</div>
@@ -56,7 +56,7 @@
 {{end}}
 
 {{if eq .Page "browse"}}
-<div class="heading"><div><small>{{.Directory.Bucket}}</small><h1>{{.Directory.Name}}</h1><span class="badge">{{if .Writable}}Writable{{else}}Read-only{{end}}</span> <span class="badge">{{if eq .Directory.EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span></div><a href="/directories/{{.Directory.ID}}/edit">Directory settings</a></div>
+<div class="heading"><div><small>{{.Directory.Bucket}}</small><h1>{{.Directory.Name}}</h1><span class="badge">{{if .Writable}}Writable{{else}}Read-only{{end}}</span> <span class="badge">{{if eq .Directory.EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span></div><div>{{if .ShareEnabled}}<a href="/directories/{{.Directory.ID}}/shares?path={{urlquery .Path}}&amp;kind=directory">Sharing</a> · {{end}}<a href="/directories/{{.Directory.ID}}/edit">Directory settings</a></div></div>
 <nav aria-label="Breadcrumb"><ul><li><a href="/">Directories</a></li>{{range .Crumbs}}<li><a href="{{.URL}}">{{.Name}}</a></li>{{end}}</ul></nav>
 {{if .Writable}}<div class="actions"><details><summary role="button">Upload file</summary><article>
 <p>Destination: {{.Directory.Name}} / {{.Path}}<br>{{if eq .Directory.EncryptionMode "rclone_crypt"}}Encrypted automatically using this directory's rclone crypt settings.{{else}}Stored without rclone encryption.{{end}} Maximum {{size .UploadLimit}}.</p>
@@ -65,8 +65,32 @@
 <details><summary>New folder</summary><form method="post" action="/directories/{{.Directory.ID}}/mkdir" hx-post="/directories/{{.Directory.ID}}/mkdir" hx-target="#main"><input type="hidden" name="revision" value="{{.Directory.Revision}}"><label>Relative folder path<input name="path" value="{{if .Path}}{{.Path}}/{{end}}" required placeholder="new-folder"></label><button>Create folder</button></form></details></div>{{end}}
 <div class="overflow-auto"><table><thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead><tbody>{{if .Parent}}<tr><td><a href="{{.Parent}}">↑ Parent directory</a></td><td></td><td></td></tr>{{end}}
 {{range .Entries}}<tr><td>{{if .Directory}}<a href="/directories/{{$.Directory.ID}}?path={{urlquery .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td>{{if not .Directory}}<a href="/directories/{{$.Directory.ID}}/download?path={{urlquery .Path}}">Download</a>{{end}}
+{{if $.ShareEnabled}} <a href="/directories/{{$.Directory.ID}}/shares?path={{urlquery .Path}}&amp;kind={{if .Directory}}directory{{else}}file{{end}}">Share</a>{{end}}
 {{if $.Writable}}<details><summary>{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</summary><form method="post" action="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-post="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-target="#main"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="revision" value="{{$.Directory.Revision}}"><label><input type="checkbox" name="confirm" required>Confirm {{.Name}}</label><button class="secondary">{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</button></form></details>{{end}}</td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}</tbody></table></div>
 <nav aria-label="Pages"><ul>{{if .Previous}}<li><a href="{{.Previous}}">← Previous</a></li>{{end}}</ul><ul>{{if .Next}}<li><a href="{{.Next}}">Next →</a></li>{{end}}</ul></nav>
 {{end}}
 {{if eq .Page "message"}}<article role="status"><p>{{.Message}}</p><a href="/">Directories</a> · <a href="/connections">Storage connections</a></article>{{end}}
+
+{{if eq .Page "shares"}}
+<div class="heading"><div><small>SHARING</small><h1>{{.Directory.Name}}</h1><p>Links give read-only access to the selected file or folder. Folder shares include all descendants and future files. Shares stay attached to this directory.</p></div><a href="/directories/{{.Directory.ID}}">Back to directory</a></div>
+<article class="form-card"><h2>Create share</h2><form method="post" action="/directories/{{.Directory.ID}}/shares" hx-post="/directories/{{.Directory.ID}}/shares" hx-target="#main">
+<label>Path within this directory<input name="path" value="{{.Path}}" placeholder="Leave empty for the entire directory"></label>
+<label>Share type<select name="kind"><option value="directory" {{if .ShareDirectory}}selected{{end}}>Directory and its contents</option><option value="file" {{if not .ShareDirectory}}selected{{end}}>Single file</option></select></label>
+<label>Password (optional)<input type="password" name="password" autocomplete="new-password" maxlength="72"></label>
+<label>Expires after (minutes, optional)<input type="number" name="expires_in_minutes" min="1" step="1" placeholder="Never"></label><small>Leave blank for no expiration.</small><button>Create share link</button></form></article>
+{{range .Shares}}<article><h2>{{if .Path}}{{.Path}}{{else}}Entire directory{{end}}</h2><p>{{if .IsDirectory}}Directory{{else}}File{{end}} · {{if .PasswordHash}}Password required{{else}}Anyone with the link{{end}}</p>
+<p>{{if .ExpiresAt}}Expires <time datetime="{{.ExpiresAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.ExpiresAt.UTC.Format "2006-01-02 15:04:05"}} UTC</time>{{else}}No expiration{{end}}</p>
+<label>Share link<input readonly value="{{$.ShareURL}}/s/{{.ID}}"></label><a href="{{$.ShareURL}}/s/{{.ID}}" target="_blank" rel="noreferrer">Open share</a>
+<form method="post" action="/directories/{{$.Directory.ID}}/shares/{{.ID}}/remove" hx-post="/directories/{{$.Directory.ID}}/shares/{{.ID}}/remove" hx-target="#main"><button class="secondary">Revoke share</button></form></article>{{else}}<p>No active shares.</p>{{end}}
+{{end}}
+{{if eq .Page "share-password"}}
+<article class="form-card"><h1>This share requires a password</h1>{{if .Message}}<p role="alert">{{.Message}}</p>{{end}}<form method="post" action="{{.ShareURL}}/unlock" hx-post="{{.ShareURL}}/unlock" hx-target="#main"><label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="72"></label><button>Open share</button></form></article>
+{{end}}
+{{if eq .Page "shared"}}
+<div class="heading"><div><small>SHARED FILES</small><h1>{{.Message}}</h1><p>Read-only access{{if .Path}} · {{.Path}}{{end}}</p></div>{{range .Crumbs}}<a href="{{.URL}}">Share root</a>{{end}}</div>
+<div class="overflow-auto"><table><thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead><tbody>
+{{if .Parent}}<tr><td><a href="{{.Parent}}">↑ Parent directory</a></td><td></td><td></td></tr>{{end}}
+{{range .Entries}}<tr><td>{{if .Directory}}<a href="{{$.ShareURL}}?path={{urlquery .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td>{{if not .Directory}}<a href="{{$.ShareURL}}/download?path={{urlquery .Path}}">Download</a>{{end}}</td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}
+</tbody></table></div><nav aria-label="Pages"><ul>{{if .Previous}}<li><a href="{{.Previous}}">← Previous</a></li>{{end}}</ul><ul>{{if .Next}}<li><a href="{{.Next}}">Next →</a></li>{{end}}</ul></nav>
+{{end}}
 {{end}}

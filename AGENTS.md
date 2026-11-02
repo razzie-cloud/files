@@ -12,7 +12,17 @@ Frontend: embedded HTMX and PicoCSS only; retain vendored licenses. No SPA or
 frontend build pipeline. Keep CSP-compatible settings and escaped templates.
 
 User identity comes only from proxy-supplied X-Auth-Request-User UUIDs. Every
-metadata lookup is owner-scoped. Public traffic must pass through the gateway.
+metadata lookup is owner-scoped. Management traffic must pass through the gateway.
+Public shares use a separate SHARE_ORIGIN hostname and capability-only router;
+never accept proxy identity there. Only the random share-token lookup is unscoped;
+use its persisted owner for all subsequent metadata and secret reads. Shares are
+immutable and bound to directory IDs with deletion cascading; never resolve a
+share by directory name or physical S3 location. Public operations are read-only.
+Optional share expiration is checked on every public request, including cache hits
+and password unlock; session cookies must not grant access past that deadline.
+Keep the fixed 30-second bounded snapshot cache, fail closed after expiry, and
+invalidate locally on management changes. Password sessions are share-scoped,
+signed, host-only cookies; never render passwords, hashes, or signing keys.
 Enforce read-only access before opening storage, and recheck after write locks.
 Store secrets as owner-scoped PostgreSQL records; keep them out of rendered forms
 and logs. Retain crypt recovery secrets when deleting mappings. Config deletion

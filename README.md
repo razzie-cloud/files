@@ -10,13 +10,14 @@ The executable embeds HTMX 2.0.8, PicoCSS 2.1.1, templates, and local assets.
 
 ## Authentication
 
-All public routes must run behind access-gateway forward authentication. Files
+All management routes on `ORIGIN` must run behind access-gateway forward authentication. Files
 trusts `X-Auth-Request-User` (canonical UUID) for ownership and
 `X-Auth-Request-Name` for display. It has no account database or login endpoint.
 The proxy must remove incoming identity headers and replace them with verified
 gateway headers. Do not publish the backend port or permit untrusted peers on
 its private network. Internal `/healthz` and `/readyz` do not require identity;
-the public proxy must protect these paths too.
+the management proxy must protect these paths too. The separate sharing proxy
+only exposes `/s/*` and `/static/*`, returning 404 for everything else.
 
 Example Caddy route (the gateway must allow this exact files origin):
 
@@ -39,6 +40,64 @@ through forward auth. Gateway sign-out revokes subsequent requests; existing
 streams run until completion/cancellation. All application mutations require a
 matching Origin header. There is no special admin bypass.
 
+## Sharing
+
+Set `SHARE_ORIGIN=https://shared-files.example.com` and point that hostname at
+Caddy. Preserve the original Host header when proxying. Keep management on
+`ORIGIN` behind forward auth; the share host deliberately allows unauthenticated
+visitors and must not be added to the gateway's `FORWARD_AUTH_ORIGINS`.
+
+```caddyfile
+shared-files.example.com {
+    route {
+        request_header -X-Auth-Request-User
+        request_header -X-Auth-Request-Name
+        @shared path /s/* /static/*
+        reverse_proxy @shared files:8080
+        respond 404
+    }
+}
+```
+
+Use **Share** beside a file/folder, or **Sharing** in the directory toolbar.
+Leave the path empty and select Directory to share the entire mapped directory.
+Owners can list/copy links and revoke them from this page, including on read-only
+storage connections. Public pages allow browsing and downloading only, with
+pagination and HTTP range downloads; rclone crypt decryption works normally.
+Directory shares include descendants and future contents. Links are live views:
+replacing an object at the same path changes what recipients download.
+
+Set **Expires after** to a positive whole number of minutes, or leave it blank
+for no expiration. The management page shows the deadline in UTC. Expired links
+return 404 for browsing, downloads, and password entry, even with cached metadata
+or an existing password cookie. Password sessions end at the earlier of 12 hours
+or the share deadline. Expired records remain visible to their owner for removal;
+no cleanup job is required. Downloads already in flight may finish.
+
+Each random 256-bit link is permanently bound to the owner's **directory ID** and
+relative path/type. Renaming a directory keeps its shares; deleting its
+configuration cascades to its shares. Recreating the same name, bucket, or prefix
+does not restore them. Scope/password/expiration changes require revoking and creating a new
+link. Share URLs are bearer credentials; keep them private when appropriate.
+
+Optional passwords are stored as bcrypt hashes (maximum 72 UTF-8 bytes). A correct
+password sets a host-only, HttpOnly, SameSite=Lax session cookie scoped to that
+share's path, with Secure on HTTPS. Browser sessions have a maximum lifetime of
+12 hours and survive service restarts/replica changes using a persisted per-share
+signing key. Password checks have two concurrent slots and a process-wide limit
+of two attempts per second with a burst of five. Public mutations require the
+exact sharing Origin. User-supplied identity headers cannot unlock shares or
+expose management routes on the sharing host.
+
+Each replica caches share, directory, connection, and storage credentials for a
+fixed **30 seconds**, with at most 1,024 entries and coalesced concurrent loads.
+Refreshes reuse this snapshot without database queries; S3 listings/content stay
+live. Missing links are cached for five seconds. Backend errors are not cached,
+and expired snapshots are never served on errors. Management changes clear the
+local cache; other replicas see revocation/deletion/credential changes within
+30 seconds. Downloads already in flight may finish. Responses use `no-store` and
+`no-referrer`, so HTML and passwords are not cached in the browser.
+
 ## Configuration
 
 Each environment variable also has a kebab-case CLI flag, for example
@@ -48,6 +107,7 @@ Each environment variable also has a kebab-case CLI flag, for example
 | --- | --- |
 | `SERVICE_PORT` | Listener port, default `8080` (`--port`) |
 | `ORIGIN` | Required exact public files origin, no path |
+| `SHARE_ORIGIN` | Optional exact public sharing origin on a different hostname (`--share-origin`); unset disables sharing |
 | `POSTGRES_URI_FROM` | Normal deployment: `http://database-broker:8080/v1/instances/postgres/files/uri` |
 | `POSTGRES_URI` | Direct development/recovery override; set exactly one database option |
 | `POSTGRES_PASSWORD_FILE` | Optional file overriding the URI's password |
@@ -61,7 +121,7 @@ Each environment variable also has a kebab-case CLI flag, for example
 Startup fetches a broker-provisioned database URI with bounded retries, validates
 the response, connects, and applies embedded Goose migrations under a PostgreSQL
 session lock. Broker errors do not expose credentials or start a partial server.
-Files needs no Redis: gateway sessions stay in the gateway.
+Files needs no Redis: gateway sessions stay in the gateway; share password sessions use signed cookies.
 
 An authenticated loopback egress proxy inside the process enforces S3 destination
 policy for rclone's HTTP clients. It validates DNS results at each new connection,
@@ -118,8 +178,8 @@ multipart uploads. Directory deletion is empty-only; bucket deletion is forbidde
 Listings are bounded and paginated 100 entries per page. A directory over the
 entry limit produces an explicit error, not a silently truncated view. Refreshes
 can re-list remotely. Downloads support one byte range, including through crypt.
-Sharing, previews, recursive deletion, rename/move, full-text search, and resumable
-browser uploads are outside this first release.
+Previews, recursive deletion, rename/move, full-text search, and resumable
+browser uploads are not supported.
 
 ## Secret storage and recovery
 

@@ -16,11 +16,11 @@ import (
 )
 
 type Config struct {
-	Port, Origin, PostgresURI, PostgresURIFrom, PasswordFile, ImportSecretsDir string
-	PrivateEndpoints                                                           string
-	AllowHTTP                                                                  bool
-	MaxUploadBytes                                                             int64
-	MaxUploads, MaxEntries                                                     int
+	Port, Origin, ShareOrigin, PostgresURI, PostgresURIFrom, PasswordFile, ImportSecretsDir string
+	PrivateEndpoints                                                                        string
+	AllowHTTP                                                                               bool
+	MaxUploadBytes                                                                          int64
+	MaxUploads, MaxEntries                                                                  int
 }
 
 func Load(args []string, env func(string) string) (Config, error) {
@@ -36,6 +36,7 @@ func Load(args []string, env func(string) string) (Config, error) {
 	}
 	str(&c.Port, "port", "SERVICE_PORT", "8080")
 	str(&c.Origin, "origin", "ORIGIN", "")
+	str(&c.ShareOrigin, "share-origin", "SHARE_ORIGIN", "")
 	str(&c.PostgresURI, "postgres-uri", "POSTGRES_URI", "")
 	str(&c.PostgresURIFrom, "postgres-uri-from", "POSTGRES_URI_FROM", "")
 	str(&c.PasswordFile, "postgres-password-file", "POSTGRES_PASSWORD_FILE", "")
@@ -81,8 +82,14 @@ func Load(args []string, env func(string) string) (Config, error) {
 		return c, errors.New("invalid service port")
 	}
 	origin, e := url.Parse(c.Origin)
-	if e != nil || origin.Host == "" || (origin.Scheme != "http" && origin.Scheme != "https") || origin.User != nil || origin.RawQuery != "" || origin.Fragment != "" || origin.Path != "" {
+	if e != nil || origin.Host == "" || (origin.Scheme != "http" && origin.Scheme != "https") || origin.User != nil || origin.RawQuery != "" || origin.Fragment != "" || origin.Path != "" || origin.Opaque != "" || origin.ForceQuery {
 		return c, errors.New("ORIGIN must be an exact http(s) origin without a path")
+	}
+	if c.ShareOrigin != "" {
+		shared, err := url.Parse(c.ShareOrigin)
+		if err != nil || shared.Host == "" || (shared.Scheme != "http" && shared.Scheme != "https") || shared.User != nil || shared.RawQuery != "" || shared.Fragment != "" || shared.Path != "" || shared.Opaque != "" || shared.ForceQuery || strings.EqualFold(strings.TrimSuffix(shared.Hostname(), "."), strings.TrimSuffix(origin.Hostname(), ".")) {
+			return c, errors.New("SHARE_ORIGIN must be an exact http(s) origin on a different hostname from ORIGIN")
+		}
 	}
 	if (c.PostgresURI == "") == (c.PostgresURIFrom == "") {
 		return c, errors.New("set exactly one of POSTGRES_URI and POSTGRES_URI_FROM")

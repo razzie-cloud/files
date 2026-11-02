@@ -96,7 +96,7 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 	defer proxy.Close()
 	secretStore := secrets.New(repo.DB)
 	factory := &rclonestorage.Factory{ProxyURL: proxy.URL, Policy: policy, MaxEntries: 100}
-	cfg := config.Config{Origin: "http://files.localhost:8082", MaxUploads: 2, MaxUploadBytes: 1 << 20}
+	cfg := config.Config{Origin: "http://files.localhost:8082", ShareOrigin: "http://shared-files.localhost:8082", MaxUploads: 2, MaxUploadBytes: 1 << 20}
 	srv, e := New(cfg, repo, secretStore, factory, policy)
 	if e != nil {
 		t.Fatal(e)
@@ -224,6 +224,7 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			if rec = request("POST", base+"/delete-file", url.Values{"path": {"hello + %.txt"}, "revision": {"1"}, "confirm": {"on"}}, testOwner); rec.Code != 303 {
 				t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 			}
+			exerciseShareWorkflow(t, srv, repo, d)
 		})
 	}
 }

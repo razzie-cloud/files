@@ -58,3 +58,35 @@ func TestBrokerRetriesAndCancellation(t *testing.T) {
 		t.Fatalf("calls=%d error=%v", calls, e)
 	}
 }
+
+func TestShareOriginValidation(t *testing.T) {
+	for _, origin := range []string{"", "https://shared-files.example.com", "http://shared-files.localhost:8082"} {
+		cfg, err := Load(nil, func(key string) string {
+			switch key {
+			case "ORIGIN":
+				return "https://files.example.com"
+			case "SHARE_ORIGIN":
+				return origin
+			case "POSTGRES_URI":
+				return "postgres://u:p@localhost/files"
+			}
+			return ""
+		})
+		if err != nil || cfg.ShareOrigin != origin {
+			t.Fatalf("valid share origin %q: %v", origin, err)
+		}
+	}
+	for _, origin := range []string{"https://files.example.com", "http://FILES.example.com:8083", "https://files.example.com.", "https://shared.example.com/path", "https://user@shared.example.com", "https://shared.example.com?q=1", "https://shared.example.com#fragment", "https://shared.example.com?", "ftp://shared.example.com", "shared.example.com"} {
+		if _, err := Load([]string{"--share-origin", origin}, func(key string) string {
+			switch key {
+			case "ORIGIN":
+				return "https://files.example.com"
+			case "POSTGRES_URI":
+				return "postgres://u:p@localhost/files"
+			}
+			return ""
+		}); err == nil {
+			t.Fatalf("invalid share origin accepted: %q", origin)
+		}
+	}
+}

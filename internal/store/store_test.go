@@ -31,6 +31,49 @@ func TestOwnershipRevisionsAndPrefixes(t *testing.T) {
 	if e := repo.SaveDirectory(ctx, &d); e != nil {
 		t.Fatal(e)
 	}
+	share := store.Share{Owner: bob, DirectoryID: d.ID, IsDirectory: true}
+	if err := repo.CreateShare(ctx, &share); !errors.Is(err, store.ErrConflict) {
+		t.Fatal("cross-owner share persisted", err)
+	}
+	share.Owner = alice
+	if err := repo.CreateShare(ctx, &share); err != nil {
+		t.Fatal(err)
+	}
+	if list, err := repo.Shares(ctx, bob, d.ID); err != nil || len(list) != 0 {
+		t.Fatal("cross-owner share list", list, err)
+	}
+	if err := repo.RemoveShare(ctx, bob, d.ID, share.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatal("cross-owner share deletion", err)
+	}
+	if err := repo.RemoveShare(ctx, alice, uuid.NewString(), share.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatal("share deleted through another directory", err)
+	}
+	if err := repo.RemoveShare(ctx, alice, d.ID, share.ID); err != nil {
+		t.Fatal(err)
+	}
+	// Optional deadlines round-trip; expired links remain manageable by owners
+	// while public discovery rejects them, including on an uncached replica.
+	for _, deadline := range []time.Time{time.Now().Add(time.Hour).UTC().Truncate(time.Microsecond), time.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)} {
+		expiring := store.Share{Owner: alice, DirectoryID: d.ID, IsDirectory: true, ExpiresAt: &deadline}
+		if err := repo.CreateShare(ctx, &expiring); err != nil {
+			t.Fatal(err)
+		}
+		list, err := repo.Shares(ctx, alice, d.ID)
+		if err != nil || len(list) != 1 || list[0].ExpiresAt == nil || !list[0].ExpiresAt.Equal(deadline) {
+			t.Fatal("expiration did not round-trip", list, err)
+		}
+		found, err := repo.PublicShare(ctx, expiring.ID)
+		if deadline.Before(time.Now()) {
+			if !errors.Is(err, store.ErrNotFound) {
+				t.Fatal("expired link discovered publicly", err)
+			}
+		} else if err != nil || found.ExpiresAt == nil || !found.ExpiresAt.Equal(deadline) {
+			t.Fatal("active expiring link unavailable", err)
+		}
+		if err := repo.RemoveShare(ctx, alice, d.ID, expiring.ID); err != nil {
+			t.Fatal("owner cannot remove expiring share", err)
+		}
+	}
 	for _, prefix := range []string{"", "photos", "photos/nested"} {
 		other := d
 		other.ID = ""
