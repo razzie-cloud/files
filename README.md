@@ -8,6 +8,14 @@ The Go service embeds **rclone v1.75.2** as a library. It composes the S3 backen
 with optional rclone `crypt`, with no subprocess, RC API, or custom encryption.
 The executable embeds HTMX 2.0.8, PicoCSS 2.1.1, templates, and local assets.
 
+Image and video files have an **Open** action in private folders and public
+shares. Previews use a native HTML dialog with images and video controls, keeping
+the folder in place. Previous/Next moves through media on the current listing
+page; Escape, the close button, or the backdrop closes the dialog. Video seeking
+uses streamed byte ranges, including for rclone-encrypted files. Supported image
+formats and video codecs depend on the browser; Download remains available when
+a file cannot be displayed.
+
 ## Authentication
 
 All management routes on `ORIGIN` must run behind access-gateway forward authentication. Files

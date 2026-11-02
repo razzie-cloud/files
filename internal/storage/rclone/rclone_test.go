@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"net/netip"
 	"net/url"
 	"strings"
@@ -130,6 +131,72 @@ func TestS3AndCryptRoundTrip(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestNestedDirectoryListing(t *testing.T) {
+	ctx := context.Background()
+	remote, _ := testutil.S3(t, "files-test")
+	endpoint, _ := url.Parse(remote.URL)
+	policy, err := NewPolicy(endpoint.Host, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy, err := StartEgress(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer proxy.Close()
+	factory := &Factory{ProxyURL: proxy.URL, Policy: policy, MaxEntries: 100}
+	c := store.Connection{Provider: "Other", Endpoint: remote.URL, Region: "us-east-1", PathStyle: true}
+	credentials := secrets.Value{AccessKey: "dummy", SecretKey: "dummy-secret"}
+	keys := secrets.Value{Password: "nested directory test password"}
+	for _, mode := range []string{"none", "rclone_crypt"} {
+		t.Run(mode, func(t *testing.T) {
+			d := store.Directory{Bucket: "files-test", Prefix: mode, EncryptionMode: mode, FilenameEncryption: "standard", DirectoryEncryption: true, FilenameEncoding: "base32"}
+			writer, err := factory.Open(ctx, c, d, credentials, keys)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer writer.Close()
+			if err := writer.Put(ctx, "parent + %/child árvíz/file.txt", strings.NewReader("nested contents")); err != nil {
+				t.Fatal(err)
+			}
+			if err := writer.Mkdir(ctx, "parent + %/empty"); err != nil {
+				t.Fatal(err)
+			}
+			for _, test := range []struct {
+				dir  string
+				want []storage.Entry
+			}{
+				{"", []storage.Entry{{Name: "parent + %", Path: "parent + %", Directory: true}}},
+				{"parent + %", []storage.Entry{{Name: "child árvíz", Path: "parent + %/child árvíz", Directory: true}, {Name: "empty", Path: "parent + %/empty", Directory: true}}},
+				{"parent + %/child árvíz", []storage.Entry{{Name: "file.txt", Path: "parent + %/child árvíz/file.txt", Size: int64(len("nested contents"))}}},
+				{"parent + %/empty", []storage.Entry{}},
+			} {
+				// Browsing uses a new storage handle for each request.
+				reader, err := factory.Open(ctx, c, d, credentials, keys)
+				if err != nil {
+					t.Fatal(err)
+				}
+				entries, err := reader.List(ctx, test.dir)
+				reader.Close()
+				if err != nil {
+					t.Errorf("list %q: %v", test.dir, err)
+				}
+				// ListP can emit a directory as both a common prefix and a marker.
+				got, want := map[storage.Entry]bool{}, map[storage.Entry]bool{}
+				for _, entry := range entries {
+					got[entry] = true
+				}
+				for _, entry := range test.want {
+					want[entry] = true
+				}
+				if !maps.Equal(got, want) {
+					t.Errorf("list %q = %+v, want %+v", test.dir, entries, test.want)
+				}
+			}
+		})
 	}
 }
 

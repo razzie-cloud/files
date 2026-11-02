@@ -64,7 +64,7 @@ type view struct {
 }
 
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
-	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base}).ParseFS(web.Assets, "templates.html")
+	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base, "mediaKind": mediaKind}).ParseFS(web.Assets, "templates.html")
 	if e != nil {
 		return nil, e
 	}
@@ -841,6 +841,22 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storage.FS, key string) {
+	contentType, disposition := "application/octet-stream", "attachment"
+	if r.URL.Query().Get("inline") == "1" {
+		contentType = mediaType(key)
+		if contentType == "" {
+			http.Error(w, "This file type cannot be previewed.", http.StatusUnsupportedMediaType)
+			return
+		}
+		disposition = "inline"
+		// A directly opened media document needs to load its own URL. SVG is
+		// an active document format: deny scripts and all subresources there.
+		policy := "default-src 'none'; media-src 'self'; img-src 'self'; sandbox allow-same-origin; frame-ancestors 'none'"
+		if contentType == "image/svg+xml" {
+			policy = "default-src 'none'; sandbox; frame-ancestors 'none'"
+		}
+		w.Header().Set("Content-Security-Policy", policy)
+	}
 	info, e := fs.Stat(r.Context(), key)
 	if e != nil {
 		s.operationError(w, r, e)
@@ -866,8 +882,8 @@ func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storag
 		s.fail(w, r, store.ErrConflict, 409)
 		return
 	}
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": path.Base(key)}))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": path.Base(key)}))
 	w.Header().Set("Accept-Ranges", "bytes")
 	length := info.Size
 	if partial {

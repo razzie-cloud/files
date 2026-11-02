@@ -45,7 +45,7 @@ func TestBrowsePathURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"simple.txt", "hello world.txt", "hello + %25.txt", "árvíz.txt", "folder/nested/file.txt", `folder & name/"<file>?x=1&path=other#.txt`} {
+	for _, key := range []string{"simple.txt", "hello world.txt", "hello + %25.txt", "árvíz.txt", "album/subfolder", "folder/nested/file.txt", `folder & name/"<file>?x=1&path=other#.txt`} {
 		t.Run(key, func(t *testing.T) {
 			d := store.Directory{ID: "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa", Revision: 7, EncryptionMode: "rclone_crypt"}
 			base := "/directories/" + d.ID

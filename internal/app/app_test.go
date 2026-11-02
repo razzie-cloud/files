@@ -221,6 +221,26 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			if rec = request("POST", base+"/mkdir", url.Values{"path": {"folder"}, "revision": {"1"}}, testOwner); rec.Code != 303 {
 				t.Fatalf("mkdir %d %s", rec.Code, rec.Body.String())
 			}
+			if rec = request("POST", base+"/mkdir", url.Values{"path": {"folder/nested + % árvíz"}, "revision": {"1"}}, testOwner); rec.Code != 303 {
+				t.Fatalf("nested mkdir %d %s", rec.Code, rec.Body.String())
+			}
+			listing = request("GET", base, nil, testOwner)
+			for _, key := range []string{"folder", "folder/nested + % árvíz"} {
+				target := ""
+				for _, u := range pageURLs(t, listing.Body.String(), "a", "href") {
+					if u.Path == base && u.Query().Get("path") == key {
+						target = u.String()
+						break
+					}
+				}
+				if target == "" {
+					t.Fatalf("missing folder link for %q", key)
+				}
+				listing = request("GET", target, nil, testOwner)
+				if listing.Code != 200 {
+					t.Fatalf("browse %q: %d %s", key, listing.Code, listing.Body.String())
+				}
+			}
 			if rec = request("POST", base+"/delete-file", url.Values{"path": {"hello + %.txt"}, "revision": {"1"}, "confirm": {"on"}}, testOwner); rec.Code != 303 {
 				t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 			}
