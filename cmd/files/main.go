@@ -72,6 +72,8 @@ func run() error {
 	if e != nil {
 		return sanitized("template initialization failed")
 	}
+	stopHealth := server.StartHealthChecks(ctx)
+	defer stopHealth()
 	httpServer := &http.Server{Addr: cfg.Address(), Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	shutdownDone := make(chan struct{})
 	go func() {

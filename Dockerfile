@@ -11,5 +11,5 @@ COPY --from=build /out/files /usr/local/bin/files
 USER files
 ENV SERVICE_PORT=8080
 EXPOSE 8080
-HEALTHCHECK --interval=15s --timeout=3s CMD wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s CMD wget -q -O /dev/null http://127.0.0.1:${SERVICE_PORT:-8080}/readyz || exit 1
 ENTRYPOINT ["/usr/local/bin/files"]

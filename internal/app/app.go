@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/razzie-cloud/files/internal/config"
+	"github.com/razzie-cloud/files/internal/health"
 	"github.com/razzie-cloud/files/internal/identity"
 	"github.com/razzie-cloud/files/internal/secrets"
 	"github.com/razzie-cloud/files/internal/storage"
@@ -36,6 +37,7 @@ type Server struct {
 	Policy    *rclonestorage.Policy
 	templates *template.Template
 	uploads   chan struct{}
+	health    *health.Monitor
 }
 type userKey struct{}
 type crumb struct{ Name, URL string }
@@ -57,7 +59,13 @@ func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, f
 	if e != nil {
 		return nil, e
 	}
-	return &Server{Config: cfg, Repo: repo, Secrets: secretStore, Storage: factory, Policy: policy, templates: t, uploads: make(chan struct{}, cfg.MaxUploads)}, nil
+	return &Server{Config: cfg, Repo: repo, Secrets: secretStore, Storage: factory, Policy: policy, templates: t, uploads: make(chan struct{}, cfg.MaxUploads),
+		health: health.New(health.Check{Name: "postgres", Ping: func(ctx context.Context) error { return repo.Ping(ctx) }})}, nil
+}
+
+// StartHealthChecks starts the background monitor; stop it before closing Repo.
+func (s *Server) StartHealthChecks(ctx context.Context) func() {
+	return s.health.Start(ctx)
 }
 func size(n int64) string {
 	if n < 0 {
@@ -96,6 +104,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /directories/{id}/delete-file", s.mutate)
 	mux.HandleFunc("POST /directories/{id}/rmdir", s.mutate)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.health.Handle(w, r) {
+			return
+		}
 		var random [8]byte
 		rand.Read(random[:])
 		requestID := hex.EncodeToString(random[:])
@@ -104,28 +115,6 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if r.URL.Path == "/healthz" {
-			if r.Method != "GET" {
-				w.WriteHeader(405)
-				return
-			}
-			w.Write([]byte("ok\n"))
-			return
-		}
-		if r.URL.Path == "/readyz" {
-			if r.Method != "GET" {
-				w.WriteHeader(405)
-				return
-			}
-			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-			defer cancel()
-			if s.Repo.Ping(ctx) != nil {
-				http.Error(w, "not ready", 503)
-				return
-			}
-			w.Write([]byte("ready\n"))
-			return
-		}
 		user, e := identity.FromRequest(r)
 		if e != nil {
 			http.Error(w, "Verified proxy identity required", 401)
