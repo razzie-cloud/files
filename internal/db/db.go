@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"embed"
 	"io/fs"
+	"log/slog"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
+	"github.com/razzie-cloud/files/internal/logging"
 )
 
 //go:embed migrations/*.sql
@@ -22,10 +25,17 @@ func Migrate(ctx context.Context, database *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	provider, err := goose.NewProvider(goose.DialectPostgres, database, root, goose.WithSessionLocker(locker))
+	provider, err := goose.NewProvider(goose.DialectPostgres, database, root, goose.WithSessionLocker(locker), goose.WithLogger(goose.NopLogger()))
 	if err != nil {
 		return err
 	}
-	_, err = provider.Up(ctx)
-	return err
+	start := time.Now()
+	results, err := provider.Up(ctx)
+	if err != nil {
+		return logging.Wrap("migrate_postgres", err)
+	}
+	if len(results) > 0 {
+		slog.Info("Database migrations applied", "event", "migrations.applied", "component", "postgres", "count", len(results), "version", results[len(results)-1].Source.Version, "duration_ms", time.Since(start).Milliseconds())
+	}
+	return nil
 }

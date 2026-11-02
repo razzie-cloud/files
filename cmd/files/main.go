@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +14,7 @@ import (
 	"github.com/razzie-cloud/files/internal/app"
 	"github.com/razzie-cloud/files/internal/config"
 	"github.com/razzie-cloud/files/internal/db"
+	"github.com/razzie-cloud/files/internal/logging"
 	"github.com/razzie-cloud/files/internal/secrets"
 	rclonestorage "github.com/razzie-cloud/files/internal/storage/rclone"
 	"github.com/razzie-cloud/files/internal/store"
@@ -22,7 +23,7 @@ import (
 func run() error {
 	cfg, e := config.Load(os.Args[1:], os.Getenv)
 	if e != nil {
-		return e
+		return logging.Wrap("config", e)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -30,62 +31,63 @@ func run() error {
 	defer cancel()
 	uri, e := cfg.DatabaseURI(startup)
 	if e != nil {
-		return e
+		return logging.Wrap("database_discovery", e)
 	}
 	database, e := sql.Open("pgx", uri)
 	if e != nil {
-		return e
+		return logging.Wrap("postgres_open", e)
 	}
 	defer database.Close()
 	database.SetMaxOpenConns(cfg.MaxUploads + 16)
 	database.SetMaxIdleConns(4)
 	database.SetConnMaxLifetime(30 * time.Minute)
 	if e = database.PingContext(startup); e != nil {
-		return sanitized("database unavailable")
+		return logging.Wrap("postgres_connect", e)
 	}
 	if e = db.Migrate(startup, database); e != nil {
-		return sanitized("database migration failed")
+		return logging.Wrap("migrate_postgres", e)
 	}
 	secretStore := secrets.New(database)
 	if cfg.ImportSecretsDir != "" {
 		if e = secretStore.Import(startup, cfg.ImportSecretsDir); e != nil {
-			return e
+			return logging.Wrap("import_secrets", e)
 		}
 	}
 	if e = secretStore.Ready(startup); e != nil {
-		return e
+		return logging.Wrap("secrets_ready", e)
 	}
 	policy, e := rclonestorage.NewPolicy(cfg.PrivateEndpoints, cfg.AllowHTTP)
 	if e != nil {
-		return e
+		return logging.Wrap("egress_policy", e)
 	}
 	if e = rclonestorage.Initialize(); e != nil {
-		return sanitized("rclone initialization failed")
+		return logging.Wrap("rclone_init", e)
 	}
 	egress, e := rclonestorage.StartEgress(policy)
 	if e != nil {
-		return sanitized("cannot start S3 egress proxy")
+		return logging.Wrap("egress_init", e)
 	}
 	defer egress.Close()
 	factory := &rclonestorage.Factory{ProxyURL: egress.URL, Policy: policy, MaxEntries: cfg.MaxEntries}
 	server, e := app.New(cfg, &store.Store{DB: database}, secretStore, factory, policy)
 	if e != nil {
-		return sanitized("template initialization failed")
+		return logging.Wrap("template_init", e)
 	}
 	stopHealth := server.StartHealthChecks(ctx)
 	defer stopHealth()
-	httpServer := &http.Server{Addr: cfg.Address(), Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
+	httpServer := &http.Server{Addr: cfg.Address(), Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10, ErrorLog: logging.ServerLogger()}
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		if httpServer.Shutdown(shutdown) != nil {
+		if err := httpServer.Shutdown(shutdown); err != nil {
+			slog.Warn("Graceful shutdown failed", "event", "server.shutdown_failed", "error_kind", logging.Kind(err))
 			httpServer.Close()
 		}
 	}()
-	log.Printf("files listening on %s", cfg.Address())
+	slog.Info("Server listening", "event", "server.listening", "address", cfg.Address())
 	e = httpServer.ListenAndServe()
 	if e != http.ErrServerClosed {
 		stop()
@@ -96,14 +98,16 @@ func run() error {
 	if e == http.ErrServerClosed {
 		return nil
 	}
-	return e
+	return logging.Wrap("serve", e)
 }
 
-type sanitized string
-
-func (e sanitized) Error() string { return string(e) }
 func main() {
-	if e := run(); e != nil {
-		log.Fatal(e)
+	if err := logging.Setup("files"); err != nil {
+		slog.Error(err.Error(), "event", "config.invalid", "field", "LOG_LEVEL")
+		os.Exit(1)
+	}
+	if err := run(); err != nil {
+		slog.Error("Service failed", append([]any{"event", "server.failed"}, logging.ErrorAttrs(err)...)...)
+		os.Exit(1)
 	}
 }

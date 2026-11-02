@@ -304,9 +304,36 @@ after each cycle, with a two-second deadline per dependency. Until the first
 successful cycle, after a failed cycle, or once the last result is thirty seconds
 old, readiness returns 503. Probes only read cached state; they never query a
 backend, provision an instance, or generate request logs. Failed background
-checks log the dependency name once per failed cycle without raw backend errors.
+checks log dependency failure and recovery transitions without raw backend errors.
 User-configured S3 endpoints are not part of service readiness.
 
 Use these endpoints directly on the private backend port. Keep public ingress
 and authentication rules in place. Container health checks use `/readyz` on
 `SERVICE_PORT` (default 8080).
+
+## Logging
+
+Logs are JSON records written to stderr using Go's `log/slog`. Each record has
+`time`, `level`, `msg`, `service`, and a stable `event` name. `LOG_LEVEL` controls
+verbosity independently of service configuration: `DEBUG`, `INFO` (default),
+`WARN`, or `ERROR`, case-insensitive. Invalid values fail startup.
+
+Operational failures include a generated `request_id` (also returned as
+`X-Request-ID`), method, static route template, status, duration in milliseconds,
+operation, and a safe `error_kind`. Known database errors include their SQLSTATE;
+raw backend error messages and SQL are excluded. Request URLs, query strings,
+cookies, bodies, credentials, and panic values are not logged. Panic diagnostics
+include code locations only.
+
+Routine requests are quiet at INFO. DEBUG enables request summaries; static
+assets and health probes remain quiet. Dependency outages emit one
+`dependency.unavailable` WARN and a `dependency.recovered` INFO with outage
+duration, rather than repeating a warning every probe cycle. Normal canceled
+requests and interrupted client downloads are DEBUG events.
+
+Connection/directory changes, share creation/revocation, and legacy secret
+imports produce INFO events with owner/resource IDs or counts. Share IDs are
+capability tokens and are excluded, together with object names, bucket names,
+prefixes, and remote endpoints. Upload and storage-mutation summaries are DEBUG.
+Raw rclone logging remains disabled. The development S3 fixture uses the same
+JSON format and `LOG_LEVEL` setting.

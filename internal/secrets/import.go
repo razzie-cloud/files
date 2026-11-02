@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"os"
+
+	"github.com/razzie-cloud/files/internal/logging"
 )
 
 // Import copies all records, including retained recovery records, in one
@@ -35,6 +37,7 @@ func (s *Store) Import(ctx context.Context, dir string) error {
 		return errors.New("cannot begin secret import")
 	}
 	defer tx.Rollback()
+	var imported int64
 	for _, entry := range entries {
 		ref := entry.Name()
 		if len(ref) != 73 || ref[36] != '-' || !validRef(ref[:36], ref) {
@@ -69,6 +72,7 @@ func (s *Store) Import(ctx context.Context, dir string) error {
 		if err != nil {
 			return errors.New("cannot confirm secret import")
 		}
+		imported += count
 		if count == 0 {
 			var old []byte
 			if tx.QueryRowContext(ctx, `SELECT payload FROM service_secrets WHERE owner_user_id=$1 AND id=$2`, ref[:36], ref).Scan(&old) != nil {
@@ -86,5 +90,6 @@ func (s *Store) Import(ctx context.Context, dir string) error {
 	if err = tx.Commit(); err != nil {
 		return errors.New("cannot commit secret import")
 	}
+	logging.For(ctx).Info("Legacy secrets imported", "event", "secrets.import_completed", "imported_count", imported, "existing_count", int64(len(entries))-imported)
 	return nil
 }

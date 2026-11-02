@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/razzie-cloud/files/internal/logging"
 )
 
 // Policy is also used by the private egress proxy, not just form validation.
@@ -185,7 +187,7 @@ func StartEgress(policy *Policy) (*Egress, error) {
 		w.WriteHeader(response.StatusCode)
 		io.Copy(w, response.Body)
 	})
-	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10, ErrorLog: logging.ServerLogger()}
 	proxy := &Egress{URL: proxyURL.String(), server: server, listener: listener, transport: transport}
 	go server.Serve(listener)
 	return proxy, nil

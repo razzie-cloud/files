@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/razzie-cloud/files/internal/logging"
 	"github.com/razzie-cloud/files/internal/storage"
 	"github.com/razzie-cloud/files/internal/store"
 	"github.com/razzie-cloud/files/internal/web"
@@ -128,6 +129,7 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, 500)
 		return
 	}
+	logging.For(r.Context()).Info("Share created", "event", "share.created", "expires_at", v.ExpiresAt, "password_protected", v.PasswordHash != "")
 	s.shares.invalidate()
 	s.done(w, r, "/directories/"+d.ID+"/shares")
 }
@@ -144,16 +146,20 @@ func (s *Server) removeShare(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, 500)
 		return
 	}
+	logging.For(r.Context()).Info("Share revoked", "event", "share.revoked", "directory_id", d.ID)
 	s.shares.invalidate()
 	s.done(w, r, "/directories/"+d.ID+"/shares")
 }
 
 func (s *Server) publicHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static())))
-	mux.HandleFunc("GET /s/{share}", s.publicShare)
-	mux.HandleFunc("GET /s/{share}/download", s.publicShare)
-	mux.HandleFunc("POST /s/{share}/unlock", s.publicShare)
+	handle := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, logging.Route(pattern, handler))
+	}
+	mux.Handle("GET /static/", logging.Route("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static()))))
+	handle("GET /s/{share}", s.publicShare)
+	handle("GET /s/{share}/download", s.publicShare)
+	handle("POST /s/{share}/unlock", s.publicShare)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Neither proxy identity headers nor admin routes have meaning here.
 		if r.Method == http.MethodPost {
@@ -233,6 +239,7 @@ func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := snapshot.Share
+	logging.Fields(r.Context(), "owner_user_id", v.Owner, "directory_id", v.DirectoryID)
 	if v.Expired(time.Now()) {
 		s.fail(w, r, store.ErrNotFound, 404)
 		return

@@ -2,13 +2,11 @@ package app
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"html/template"
 	"io"
-	"log"
+	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
@@ -22,6 +20,7 @@ import (
 	"github.com/razzie-cloud/files/internal/config"
 	"github.com/razzie-cloud/files/internal/health"
 	"github.com/razzie-cloud/files/internal/identity"
+	"github.com/razzie-cloud/files/internal/logging"
 	"github.com/razzie-cloud/files/internal/secrets"
 	"github.com/razzie-cloud/files/internal/storage"
 	rclonestorage "github.com/razzie-cloud/files/internal/storage/rclone"
@@ -93,51 +92,41 @@ func size(n int64) string {
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static())))
-	mux.HandleFunc("GET /{$}", s.home)
-	mux.HandleFunc("GET /connections", s.connections)
-	mux.HandleFunc("GET /connections/{id}/edit", s.connections)
-	mux.HandleFunc("POST /connections", s.saveConnection)
-	mux.HandleFunc("POST /connections/{id}/update", s.saveConnection)
-	mux.HandleFunc("POST /connections/{id}/test", s.testConnection)
-	mux.HandleFunc("POST /connections/{id}/remove", s.removeConnection)
-	mux.HandleFunc("GET /directories/new", s.directoryForm)
-	mux.HandleFunc("GET /directories/{id}/edit", s.directoryForm)
-	mux.HandleFunc("POST /directories", s.saveDirectory)
-	mux.HandleFunc("POST /directories/{id}/update", s.saveDirectory)
-	mux.HandleFunc("POST /directories/{id}/test", s.testDirectory)
-	mux.HandleFunc("POST /directories/{id}/remove", s.removeDirectory)
-	mux.HandleFunc("GET /directories/{id}", s.browse)
-	mux.HandleFunc("GET /directories/{id}/download", s.download)
-	mux.HandleFunc("POST /directories/{id}/upload", s.upload)
-	mux.HandleFunc("POST /directories/{id}/mkdir", s.mutate)
-	mux.HandleFunc("POST /directories/{id}/delete-file", s.mutate)
-	mux.HandleFunc("POST /directories/{id}/rmdir", s.mutate)
-	mux.HandleFunc("GET /directories/{id}/shares", s.shareForm)
-	mux.HandleFunc("POST /directories/{id}/shares", s.createShare)
-	mux.HandleFunc("POST /directories/{id}/shares/{share}/remove", s.removeShare)
+	handle := func(pattern string, handler http.HandlerFunc) {
+		mux.Handle(pattern, logging.Route(pattern, handler))
+	}
+	mux.Handle("GET /static/", logging.Route("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static()))))
+	handle("GET /{$}", s.home)
+	handle("GET /connections", s.connections)
+	handle("GET /connections/{id}/edit", s.connections)
+	handle("POST /connections", s.saveConnection)
+	handle("POST /connections/{id}/update", s.saveConnection)
+	handle("POST /connections/{id}/test", s.testConnection)
+	handle("POST /connections/{id}/remove", s.removeConnection)
+	handle("GET /directories/new", s.directoryForm)
+	handle("GET /directories/{id}/edit", s.directoryForm)
+	handle("POST /directories", s.saveDirectory)
+	handle("POST /directories/{id}/update", s.saveDirectory)
+	handle("POST /directories/{id}/test", s.testDirectory)
+	handle("POST /directories/{id}/remove", s.removeDirectory)
+	handle("GET /directories/{id}", s.browse)
+	handle("GET /directories/{id}/download", s.download)
+	handle("POST /directories/{id}/upload", s.upload)
+	handle("POST /directories/{id}/mkdir", s.mutate)
+	handle("POST /directories/{id}/delete-file", s.mutate)
+	handle("POST /directories/{id}/rmdir", s.mutate)
+	handle("GET /directories/{id}/shares", s.shareForm)
+	handle("POST /directories/{id}/shares", s.createShare)
+	handle("POST /directories/{id}/shares/{share}/remove", s.removeShare)
 	public := s.publicHandler()
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return logging.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.health.Handle(w, r) {
 			return
 		}
-		var random [8]byte
-		rand.Read(random[:])
-		requestID := hex.EncodeToString(random[:])
-		w.Header().Set("X-Request-ID", requestID)
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		defer func() {
-			if recovered := recover(); recovered != nil {
-				if recovered == http.ErrAbortHandler {
-					panic(recovered)
-				}
-				log.Printf("request %s failed", requestID)
-				http.Error(w, "Request failed", 500)
-			}
-		}()
 		// Select public routes by the actual Host, never by forwarded identity.
 		if s.Config.ShareOrigin != "" && sameHost(r.Host, s.Config.ShareOrigin) {
 			public.ServeHTTP(w, r)
@@ -154,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), userKey{}, user))
+		logging.Fields(r.Context(), "owner_user_id", user.ID)
 		if r.Method == "POST" {
 			if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.Config.Origin {
 				http.Error(w, "Invalid request origin", 403)
@@ -175,7 +165,7 @@ func (s *Server) Handler() http.Handler {
 		}
 
 		mux.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}))
 }
 func user(r *http.Request) identity.User {
 	u, _ := r.Context().Value(userKey{}).(identity.User)
@@ -192,7 +182,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 		name = "content"
 	}
 	if e := s.templates.ExecuteTemplate(w, name, v); e != nil {
-		log.Print("template rendering failed")
+		logging.Fields(r.Context(), "template", name)
+		logging.Fail(r.Context(), slog.LevelError, "render_template", e)
 	}
 }
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, e error, status int) {
@@ -220,6 +211,15 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, e error, status in
 		if status == 422 || status == 403 || status == 429 {
 			message = e.Error()
 		}
+	}
+	if status >= 500 {
+		operation := "application"
+		if status == 502 || status == 504 {
+			operation = "storage"
+		}
+		logging.Fail(r.Context(), slog.LevelError, operation, e)
+	} else if errors.Is(e, storage.ErrCrypto) {
+		logging.FailKind(r.Context(), slog.LevelWarn, "storage", "crypto")
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -342,6 +342,11 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	action := "updated"
+	if r.PathValue("id") == "" {
+		action = "created"
+	}
+	logging.For(r.Context()).Info("Connection saved", "event", "connection.saved", "connection_id", c.ID, "action", action)
 	s.shares.invalidate()
 	s.done(w, r, "/connections")
 }
@@ -354,6 +359,7 @@ func (s *Server) removeConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	logging.For(r.Context()).Info("Connection removed", "event", "connection.removed", "connection_id", c.ID)
 	s.shares.invalidate()
 	s.done(w, r, "/connections")
 }
@@ -395,6 +401,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, e, 500)
 			return
 		}
+		logging.For(r.Context()).Info("Directory updated", "event", "directory.updated", "directory_id", d.ID, "connection_id", d.ConnectionID)
 		s.shares.invalidate()
 		s.done(w, r, "/")
 		return
@@ -481,6 +488,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	logging.For(r.Context()).Info("Directory created", "event", "directory.created", "directory_id", d.ID, "connection_id", d.ConnectionID)
 	s.shares.invalidate()
 	s.done(w, r, "/")
 }
@@ -493,6 +501,7 @@ func (s *Server) removeDirectory(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	logging.For(r.Context()).Info("Directory removed", "event", "directory.removed", "directory_id", d.ID)
 	s.shares.invalidate()
 	s.done(w, r, "/")
 }
@@ -508,6 +517,7 @@ func (s *Server) open(r *http.Request, write bool) (store.Directory, store.Conne
 	if write && !d.Writable(c) {
 		return d, c, nil, errReadOnly
 	}
+	logging.Fields(r.Context(), "directory_id", d.ID, "connection_id", c.ID)
 	credentials, e := s.Secrets.Get(r.Context(), d.Owner, c.SecretRef)
 	if e != nil {
 		return d, c, nil, e
@@ -663,6 +673,7 @@ func (s *Server) writeLock(r *http.Request, d store.Directory, c store.Connectio
 	return unlock, nil
 }
 func (s *Server) mutate(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	d, c, fs, e := s.open(r, true)
 	if e != nil {
 		s.operationError(w, r, e)
@@ -711,6 +722,7 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request) {
 		s.operationError(w, r, e)
 		return
 	}
+	logging.For(r.Context()).Debug("Storage mutation completed", "event", "storage.mutation_completed", "operation", strings.TrimPrefix(r.Pattern, "POST /directories/{id}/"), "duration_ms", time.Since(start).Milliseconds())
 	parent := path.Dir(key)
 	if parent == "." {
 		parent = ""
@@ -718,6 +730,7 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request) {
 	s.done(w, r, "/directories/"+d.ID+"?path="+url.QueryEscape(parent))
 }
 func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	d, c, fs, e := s.open(r, true)
 	if e != nil {
 		s.operationError(w, r, e)
@@ -794,6 +807,7 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	logging.For(r.Context()).Debug("Upload completed", "event", "storage.upload_completed", "bytes", s.Config.MaxUploadBytes-limited.remaining, "duration_ms", time.Since(start).Milliseconds())
 	s.done(w, r, "/directories/"+d.ID+"?path="+url.QueryEscape(query.Get("path")))
 }
 
@@ -898,7 +912,7 @@ func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storag
 		return
 	}
 	if _, e = io.CopyN(w, in, length); e != nil {
-		log.Print("download interrupted")
+		logging.Interrupted(r.Context(), e)
 		panic(http.ErrAbortHandler)
 	}
 }

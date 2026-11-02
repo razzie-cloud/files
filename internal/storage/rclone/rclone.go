@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"path"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/razzie-cloud/files/internal/logging"
 	"github.com/razzie-cloud/files/internal/secrets"
 	"github.com/razzie-cloud/files/internal/storage"
 	"github.com/razzie-cloud/files/internal/store"
@@ -108,7 +108,7 @@ func (f *Factory) Open(ctx context.Context, c store.Connection, d store.Director
 // wrap uses rclone's exported cache API because crypt has no direct fs.Fs constructor.
 // Each handle has an unguessable name, and construction is pinned against expiry.
 func wrap(ctx context.Context, name string, underlying fs.Fs, d store.Directory, keys secrets.Value, limit int) (storage.FS, error) {
-	result := &handle{fs: underlying, limit: limit, root: d.Prefix}
+	result := &handle{ctx: ctx, fs: underlying, limit: limit, root: d.Prefix}
 	if d.EncryptionMode == "rclone_crypt" {
 		alias := name + ":" + underlying.Root()
 		cache.Put(alias, underlying)
@@ -145,6 +145,7 @@ func wrap(ctx context.Context, name string, underlying fs.Fs, d store.Directory,
 }
 
 type handle struct {
+	ctx             context.Context
 	fs              fs.Fs
 	crypt           *crypt.Fs
 	cacheName, root string
@@ -158,7 +159,7 @@ func (h *handle) Close() {
 	}
 	if shutdown := h.fs.Features().Shutdown; shutdown != nil {
 		if e := shutdown(context.Background()); e != nil {
-			log.Print("storage client shutdown failed")
+			logging.For(h.ctx).Warn("Storage client shutdown failed", "event", "storage.shutdown_failed", "operation", "storage_shutdown", "error_kind", logging.Kind(e))
 		}
 	}
 }
