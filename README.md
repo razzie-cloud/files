@@ -12,7 +12,7 @@ no separate login system or local file sync.
 
 ## Try it locally
 
-Use the [razcloud local quickstart](https://github.com/razzie/razcloud#try-it-locally)
+Use the [razcloud local quickstart](https://github.com/razzie-cloud/.github#try-it-locally)
 with Git, GitHub SSH access, and Docker Compose. It starts Files together with
 its database, gateway, and reverse proxy. This repository's `docker-compose.yml`
 starts development dependencies only.
@@ -26,7 +26,7 @@ starts development dependencies only.
 4. Use **Share** beside an entry or **Sharing** in the toolbar to create a public link.
 
 For disposable storage, the parent repository also provides an
-[S3 demo](https://github.com/razzie/razcloud/blob/master/docs/development.md#disposable-s3-demo).
+[S3 demo](https://github.com/razzie-cloud/.github/blob/master/docs/development.md#disposable-s3-demo).
 For encrypted directories, keep an independent copy of the crypt passwords and
 settings so you can recover the data.
 
