@@ -126,7 +126,9 @@ embedded; CSP permits specific gstatic sender script paths. Media CORS permits
 credentials. Actual SDK dependencies and receiver CORS requests remain hardware
 acceptance items; do not broaden management CORS to fix receiver requests.
 
-Device selection precedes share creation, so canceling creates no share.
+Device selection precedes the first share creation, so canceling creates no share.
+While connected, another Cast action reuses that receiver without reopening the
+session-management picker.
 Authenticated casting creates one ordinary passwordless share, visible in
 **Sharing**, with a server-selected `CAST_SHARE_TTL` deadline (default `6h`,
 positive and at most `24h`; same configuration on every replica). Folder shares
@@ -146,7 +148,9 @@ rules bound cross-replica revocation to 30 seconds; delivered bytes and pictures
 cannot be recalled.
 
 The document-local controller survives HTMX navigation. Video supports normal
-remote play/pause, seeking, volume, and Stop. Slideshows support previous/next,
+remote play/pause, seeking, volume, and Stop. Stop ends the owned browser/receiver
+session, including an idle session; new Cast actions become available once the
+SDK finishes disconnecting. Slideshows support previous/next,
 retry, pause/resume, 2–300 seconds per picture (default 10), shuffle, and loop.
 Only one LOAD is active; rapid selections coalesce. A failed picture pauses for
 retry/skip; authorization failure stops playback. Hiding the page pauses timed

@@ -215,3 +215,50 @@ test('Next at the last picture preserves automatic slideshow completion', async 
   assert.equal(f.loads.length, 2);
   assert.equal(f.timers.size, 1); // Expiry remains enforced after completion.
 });
+
+test('Stop releases a selected session before media preparation finishes', async () => {
+  const f = fixture();
+  const response = deferred();
+  f.api.create = () => response.promise;
+  const starting = f.c.start({});
+  f.picker.resolve({});
+  await flush();
+  const selected = f.c.operation;
+  f.c.stop();
+  await flush();
+  assert.deepEqual(f.stopped, [selected]);
+  assert.equal(f.loads.length, 0);
+  response.resolve(f.data);
+  await starting;
+  assert.deepEqual(f.removed, ['/remove/one']);
+});
+test('late picker selection after Stop releases its empty session without creating a share', async () => {
+  const f = fixture();
+  const starting = f.c.start({});
+  const abandoned = f.c.operation;
+  f.c.stop();
+  f.picker.resolve({});
+  await starting;
+  await flush();
+  assert.deepEqual(f.stopped, [abandoned]);
+  assert.equal(f.creates, 0);
+  assert.equal(f.loads.length, 0);
+  assert.equal(f.c.operation, null);
+});
+test('late picker selection cannot terminate a newer active cast', async () => {
+  const f = fixture();
+  const receiver = trackReceiver(f);
+  const abandoned = f.c.start({});
+  f.adapter.pick = () => Promise.resolve({});
+  await f.c.start({});
+  await flush();
+  const latest = f.c.operation;
+  f.loads[0].resolve();
+  await flush();
+  f.picker.resolve({});
+  await abandoned;
+  await flush();
+  assert.equal(receiver.owner, latest);
+  assert.equal(f.stopped.length, 0);
+  assert.equal(f.creates, 1);
+});

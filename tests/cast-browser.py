@@ -11,20 +11,50 @@ from playwright.async_api import async_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / 'internal/web/static'
 FAKE_SDK = r'''
-window.fakeCast = {loads: [], creates: 0, removed: 0, stopped: 0};
+window.fakeCast = {loads: [], stopped: 0, ended: [], pickers: 0, current: null, sessionState: 'NO_SESSION', listeners: {}};
 const fake = window.fakeCast;
-const media = {media: {}, stop(request, yes) { fake.stopped++; yes(); }};
-const session = {getSessionId: () => 'test', getMediaSession: () => media,
- loadMedia(request) {fake.loads.push(request); media.media = request.media; return Promise.resolve();}};
-const context = {setOptions(options) { fake.options = options; }, getCastState: () => 'CONNECTED',
- addEventListener() {}, getCurrentSession: () => session,
- requestSession: () => new Promise((yes, no) => {fake.choose = yes; fake.cancel = no;})};
+fake.emit = (type, data) => (fake.listeners[type] || []).forEach(handler => handler(data));
+function newSession() {
+ const id = 'test-' + fake.pickers;
+ const media = {media: null, stop(request, yes) { fake.stopped++; yes(); }};
+ return {getSessionId: () => id, getMediaSession: () => media,
+  loadMedia(request) {fake.loads.push(request); media.media = request.media; return Promise.resolve();}};
+}
+const context = {
+ setOptions(options) { fake.options = options; },
+ getCastState: () => fake.current ? 'CONNECTED' : 'NOT_CONNECTED',
+ getSessionState: () => fake.sessionState,
+ addEventListener(type, handler) { (fake.listeners[type] ||= []).push(handler); },
+ getCurrentSession: () => fake.current,
+ requestSession() {
+  fake.pickers++;
+  if (fake.current) return Promise.reject('session_error');
+  return new Promise((yes, no) => {
+   fake.choose = () => {fake.current = newSession();fake.sessionState = 'SESSION_STARTED';fake.emit('session', {sessionState: fake.sessionState});yes();};
+   fake.cancel = () => no('cancel');
+   fake.fail = () => no('session_error');
+  });
+ },
+ endCurrentSession(stopCasting) {
+  if (!fake.current || fake.sessionState === 'SESSION_ENDING') return;
+  const session = fake.current;
+  fake.ended.push({id: session.getSessionId(), stopCasting});
+  fake.sessionState = 'SESSION_ENDING';fake.emit('session', {sessionState: fake.sessionState});
+  fake.finishEnd = () => {
+   if (fake.current !== session) return;
+   fake.current = null;fake.sessionState = 'SESSION_ENDED';
+   fake.emit('session', {sessionState: fake.sessionState});fake.emit('cast', {});
+  };
+  if (!fake.holdEnd) queueMicrotask(fake.finishEnd);
+ }
+};
 window.cast = {framework: {CastContext: {getInstance: () => context},
- CastState: {NO_DEVICES_AVAILABLE: 'NONE'}, SessionState: {}, CastContextEventType: {},
+ CastState: {NO_DEVICES_AVAILABLE: 'NONE'}, SessionState: {SESSION_ENDING: 'SESSION_ENDING', SESSION_ENDED: 'SESSION_ENDED'},
+ CastContextEventType: {CAST_STATE_CHANGED: 'cast', SESSION_STATE_CHANGED: 'session'},
  RemotePlayerEventType: {ANY_CHANGE:'change'}, RemotePlayer: function() {fake.player=this;this.volumeLevel=1;this.isPaused=false;},
  RemotePlayerController: function() {this.addEventListener = (_,fn) => fake.remoteChanged=fn;this.playOrPause = () => fake.toggled=true;
  this.seek = () => fake.sought=true; this.setVolumeLevel = () => fake.volume=true;}}};
-window.chrome = {cast: {AutoJoinPolicy: {ORIGIN_SCOPED:'ORIGIN'}, media: {
+window.chrome = {cast: {AutoJoinPolicy: {ORIGIN_SCOPED:'ORIGIN'}, ErrorCode: {CANCEL:'cancel'}, media: {
  DEFAULT_MEDIA_RECEIVER_APP_ID:'CC1AD845', StreamType: {BUFFERED:'BUFFERED',OTHER:'OTHER'}, PlayerState: {IDLE:'IDLE'},
  MediaInfo:function(url,mime) {this.contentId=url;this.contentType=mime;},
  PhotoMediaMetadata:function() {this.metadataType=4;}, MovieMediaMetadata:function() {this.metadataType=1;},
@@ -45,6 +75,7 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(args=['--no-sandbox'])
         page = await browser.new_page(viewport={'width': 1024, 'height': 768})
+        page.set_default_timeout(5000)
         errors, requests, state = [], [], {'create': 0, 'remove': 0, 'sdk': 0}
         page.on('pageerror', lambda error: errors.append(str(error)))
         async def route(request_route):
@@ -113,9 +144,20 @@ async def main():
         assert await page.evaluate('fakeCast.loads.length') == 3
         await page.set_viewport_size({'width': 390, 'height': 844})
         await expect(page.get_by_role('button', name='Next', exact=True)).to_be_in_viewport()
+        await page.evaluate('fakeCast.holdEnd = true')
         await page.get_by_role('button', name='Stop', exact=True).click()
         await expect(page.locator('[data-cast-status]')).to_contain_text('stopped')
-        await page.wait_for_function('fakeCast.stopped === 1')
+        await page.wait_for_function('() => fakeCast.ended.length === 1')
+        assert await page.evaluate('fakeCast.ended[0].stopCasting') is True
+        assert await page.evaluate('fakeCast.current !== null') is True
+        await page.evaluate('''() => {
+          document.querySelector('#main').innerHTML='<button data-cast="/directories/test/cast" data-path="movie.mp4" data-mode="video">Cast video</button>';
+          document.dispatchEvent(new Event('htmx:afterSwap'));
+        }''')
+        await expect(page.get_by_role('button', name='Cast video')).to_be_disabled()
+        await page.evaluate('fakeCast.finishEnd();fakeCast.holdEnd=false')
+        await expect(page.get_by_role('button', name='Cast video')).to_be_enabled()
+        assert await page.evaluate('fakeCast.current') is None
         assert state['remove'] == 1
         assert len(requests) == 3
         await page.evaluate('''() => {
@@ -149,26 +191,63 @@ async def main():
         timer = await page.evaluate('filesCast.operation.timer')
         await page.get_by_role('button', name='Previous', exact=True).click()
         assert await page.evaluate('filesCast.operation.timer') == timer
-        stopped = await page.evaluate('fakeCast.stopped')
-        created = state['create']
+        pickers = await page.evaluate('fakeCast.pickers')
+        session = await page.evaluate('fakeCast.current.getSessionId()')
+        loads = await page.evaluate('fakeCast.loads.length')
         await page.get_by_role('button', name='Cast slideshow').click()
-        await page.evaluate('fakeCast.cancel()')
-        await expect(page.locator('[data-cast-status]')).to_contain_text('canceled')
-        await page.wait_for_function('(n) => fakeCast.stopped === n + 1', arg=stopped)
-        assert state['create'] == created, 'Replacement cancellation created a share'
+        await page.wait_for_function('(n) => fakeCast.loads.length === n + 1', arg=loads)
+        assert await page.evaluate('fakeCast.pickers') == pickers
+        assert await page.evaluate('fakeCast.current.getSessionId()') == session
         removed = state['remove']
         loads = await page.evaluate('fakeCast.loads.length')
+        ended = await page.evaluate('fakeCast.ended.length')
         await page.evaluate('''() => {
           const button=document.querySelector('[data-cast]');
           button.dataset.cast='/s/existing/cast';button.dataset.path='empty';
         }''')
         await page.get_by_role('button', name='Cast slideshow').click()
-        await page.evaluate('fakeCast.choose()')
         await expect(page.locator('[data-cast-status]')).to_contain_text('no JPEG or PNG')
+        await page.wait_for_function('(n) => fakeCast.ended.length === n + 1 && !fakeCast.current', arg=ended)
         assert await page.evaluate('fakeCast.loads.length') == loads
-        assert state['remove'] == removed, 'Empty public folder attempted revocation'
+        assert state['remove'] == removed + 1, 'Only the replaced owner share should be revoked'
+        created = state['create']
+        ended = await page.evaluate('fakeCast.ended.length')
+        await page.get_by_role('button', name='Cast slideshow').click()
+        await page.get_by_role('button', name='Stop', exact=True).click()
+        await page.evaluate('fakeCast.choose()')
+        await page.wait_for_function('(n) => fakeCast.ended.length === n + 1 && !fakeCast.current', arg=ended)
+        assert state['create'] == created, 'Late picker selection created a share'
+        await page.get_by_role('button', name='Cast slideshow').click()
+        await page.evaluate('fakeCast.fail()')
+        await expect(page.locator('[data-cast-status]')).to_contain_text('Unable to connect')
+        # Session teardown must cover idle receivers and preserve unrelated media/sessions.
+        for scope in ('idle', 'foreign-media', 'foreign-session'):
+            await page.evaluate('''() => {
+              const button=document.querySelector('[data-cast]');
+              button.dataset.cast='/directories/test/cast';button.dataset.path='';
+            }''')
+            await page.get_by_role('button', name='Cast slideshow').click()
+            await page.evaluate('fakeCast.choose()')
+            await expect(page.locator('[data-cast-status]')).to_contain_text('0.jpg')
+            ended = await page.evaluate('fakeCast.ended.length')
+            await page.evaluate('''scope => {
+              if (scope === 'idle') fakeCast.current.getMediaSession().media=null;
+              else if (scope === 'foreign-media') fakeCast.current.getMediaSession().media={contentId:'https://unrelated.example/video.mp4'};
+              else fakeCast.current=newSession();
+            }''', scope)
+            await page.get_by_role('button', name='Stop', exact=True).click()
+            await expect(page.locator('[data-cast-status]')).to_contain_text('stopped')
+            if scope == 'idle':
+                await page.wait_for_function('(n) => fakeCast.ended.length === n + 1 && !fakeCast.current', arg=ended)
+            else:
+                assert await page.evaluate('fakeCast.ended.length') == ended
+                assert await page.evaluate('fakeCast.current !== null') is True
+                await page.evaluate('''() => {
+                  fakeCast.current=null;fakeCast.sessionState='SESSION_ENDED';
+                  fakeCast.emit('session',{sessionState:'SESSION_ENDED'});
+                }''')
         assert not errors, errors
         await browser.close()
-        print('PASS SDK integration, controls, HTMX, replacement cancellation, boundary paging, and empty public folders')
+        print('PASS SDK session stop/restart, connected-session replacement, late selection, controls, HTMX, and empty public folders')
 
 asyncio.run(main())

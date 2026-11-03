@@ -28,7 +28,19 @@
   const adapter = {
     pick() {
       if (!context) throw new Error("SDK unavailable");
-      return context.requestSession().then(() => context.getCurrentSession(), () => { throw { cancelled: true }; });
+      if (context.getSessionState() === cast.framework.SessionState.SESSION_ENDING) {
+        throw { safeMessage: "Cast is disconnecting. Wait a moment, then choose a device again." };
+      }
+      const session = context.getCurrentSession();
+      if (session) return Promise.resolve(session);
+      return context.requestSession().then(() => {
+        const selected = context.getCurrentSession();
+        if (!selected) throw { safeMessage: "Unable to connect to the Cast device. Try again." };
+        return selected;
+      }, error => {
+        if (error === chrome.cast.ErrorCode.CANCEL || error?.code === chrome.cast.ErrorCode.CANCEL) throw { cancelled: true };
+        throw { safeMessage: "Unable to connect to the Cast device. Check its availability and try again." };
+      });
     },
     async load(op, entry) {
       // Detect authorization/expiry failures directly; Cast LOAD errors cannot
@@ -47,9 +59,14 @@
       await op.session.loadMedia(request);
     },
     stop(op) {
-      if (!owns(op)) return;
-      const media = op.session.getMediaSession();
-      return new Promise((resolve, reject) => media.stop(new chrome.cast.media.StopRequest(), resolve, reject));
+      const session = context?.getCurrentSession();
+      if (!session || session !== op.session || context.getSessionState() === cast.framework.SessionState.SESSION_ENDING) return;
+      const contentId = session.getMediaSession()?.media?.contentId;
+      // Empty/idle sessions still need releasing. Never terminate media that
+      // has been replaced by an operation this controller does not own.
+      if (contentId && !op.sent?.has(contentId)) return;
+      context.endCurrentSession(true);
+      availability();
     },
     toggle(op) { if (owns(op)) remote.playOrPause(); },
     reconnect(op) {
@@ -89,10 +106,11 @@
     }
   }
   function availability() {
-    const available = !!context && context.getCastState() !== cast.framework.CastState.NO_DEVICES_AVAILABLE;
+    const ending = !!context && context.getSessionState() === cast.framework.SessionState.SESSION_ENDING;
+    const available = !!context && !ending && context.getCastState() !== cast.framework.CastState.NO_DEVICES_AVAILABLE;
     document.querySelectorAll("[data-cast]").forEach(button => {
       button.disabled = !available;
-      button.title = available ? "Choose a Cast device" : "Requires HTTPS, supported Chrome, and a reachable Cast device";
+      button.title = ending ? "Disconnecting the Cast session…" : (available ? "Cast to the connected receiver or choose a device" : "Requires HTTPS, supported Chrome, and a reachable Cast device");
     });
   }
   window.__onGCastApiAvailable = available => {
@@ -106,6 +124,7 @@
     context.addEventListener(cast.framework.CastContextEventType.CAST_STATE_CHANGED, availability);
     context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, event => {
       if ([cast.framework.SessionState.SESSION_ENDED, cast.framework.SessionState.SESSION_ENDING].includes(event.sessionState)) controller.disconnect();
+      availability();
     });
     availability();
   };

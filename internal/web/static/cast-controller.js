@@ -33,11 +33,14 @@ class FilesCastController {
       op.playing = false;
       op.desired = null;
       this.cleanup(op);
-      if (op.attempted.size) this.retired.add(op);
+      if (op.session || op.attempted.size) this.retired.add(op);
     }
-    // Retain previous media ownership while a replacement is being prepared.
-    // An aborted replacement must still stop that media. Wait for any LOAD,
-    // and never send old Stop requests while a newer operation is active.
+    this.stopRetired();
+    this.report(message);
+  }
+  stopRetired() {
+    // Retain ownership until a replacement succeeds. Wait for any LOAD and
+    // never terminate an old session while a newer operation is active.
     const settled = this.flight || Promise.resolve();
     settled.catch(() => {}).then(async () => {
       while (!this.operation && this.retired.size) {
@@ -46,11 +49,10 @@ class FilesCastController {
         try { await this.adapter.stop(previous); } catch (_) {}
       }
     });
-    this.report(message);
   }
   async start(source) {
     let picker;
-    try { picker = this.adapter.pick(); } catch (_) { this.report("Cast is unavailable. Use HTTPS in supported Chrome on the receiver's network."); return; }
+    try { picker = this.adapter.pick(); } catch (error) { this.report(error?.safeMessage || "Cast is unavailable. Use HTTPS in supported Chrome on the receiver's network."); return; }
     this.stop("");
     const op = { generation: this.generation, source, data: null, desired: null, displayed: null, timer: null,
       playing: !this.hidden, interval: 10000, loop: false, order: [], shuffled: false, attempted: new Set() };
@@ -58,7 +60,13 @@ class FilesCastController {
     this.report("Choose a Cast device…");
     try {
       op.session = await picker;
-      if (!this.current(op)) return;
+      if (!this.current(op)) {
+        // Stop may have been pressed while the browser picker was open.
+        // A late selection must not leave an empty receiver session attached.
+        this.retired.add(op);
+        this.stopRetired();
+        return;
+      }
       this.report("Preparing playback…");
       const data = await this.api.create(source);
       op.data = data;
