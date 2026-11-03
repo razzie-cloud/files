@@ -10,6 +10,7 @@ class FilesCastController {
     this.operation = null;
     this.generation = 0;
     this.flight = null;
+    this.retired = new Set();
     this.hidden = false;
   }
   current(op) { return this.operation === op && op.generation === this.generation; }
@@ -32,11 +33,19 @@ class FilesCastController {
       op.playing = false;
       op.desired = null;
       this.cleanup(op);
-      // A LOAD already sent to the receiver cannot be canceled. Stop its media
-      // when it settles; the adapter checks content ID and session ownership.
-      const settled = this.flight || Promise.resolve();
-      settled.catch(() => {}).then(() => { if (!this.operation) return this.adapter.stop(op); }).catch(() => {});
+      if (op.attempted.size) this.retired.add(op);
     }
+    // Retain previous media ownership while a replacement is being prepared.
+    // An aborted replacement must still stop that media. Wait for any LOAD,
+    // and never send old Stop requests while a newer operation is active.
+    const settled = this.flight || Promise.resolve();
+    settled.catch(() => {}).then(async () => {
+      while (!this.operation && this.retired.size) {
+        const previous = this.retired.values().next().value;
+        this.retired.delete(previous);
+        try { await this.adapter.stop(previous); } catch (_) {}
+      }
+    });
     this.report(message);
   }
   async start(source) {
@@ -54,7 +63,7 @@ class FilesCastController {
       const data = await this.api.create(source);
       op.data = data;
       if (!this.current(op) || op.disconnected) { this.cleanup(op); return; }
-      op.order = (data.mode === "video" ? [data.media] : data.entries).map((_, i) => i);
+      op.order = (data.mode === "video" ? [data.media] : (data.entries ?? [])).map((_, i) => i);
       if (!op.order.length) throw { safeMessage: "This folder has no JPEG or PNG pictures." };
       op.desired = 0;
       this.arm(op, Infinity);
@@ -93,6 +102,9 @@ class FilesCastController {
     try {
       await pending;
       if (!this.current(op) || connection !== op.connection) return;
+      // The new LOAD has replaced previous media; stale operations no longer
+      // need to be retained for a possible aborted replacement.
+      this.retired.clear();
       op.displayed = position;
       op.failed = null;
       op.loaded = true;
@@ -134,8 +146,11 @@ class FilesCastController {
     let next = from + delta;
     if (op.loop) next = (next + op.order.length) % op.order.length;
     else if (next < 0 || next >= op.order.length) {
-      if (automatic) { op.playing = false; this.report("Slideshow finished. Choose Previous or enable Loop to continue."); }
-      this.arm(op, Infinity);
+      if (automatic) {
+        op.playing = false;
+        this.report("Slideshow finished. Choose Previous or enable Loop to continue.");
+        this.arm(op, Infinity);
+      }
       return;
     }
     op.desired = next;

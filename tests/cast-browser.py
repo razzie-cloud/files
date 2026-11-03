@@ -57,7 +57,12 @@ async def main():
                 await request_route.fulfill(path=str(STATIC / filename))
             elif request.url.endswith('/cast'):
                 state['create'] += 1
-                mode = parse_qs(request.post_data)['mode'][0]
+                form = parse_qs(request.post_data)
+                mode = form['mode'][0]
+                if form.get('path') == ['empty']:
+                    await request_route.fulfill(json={'mode': 'slideshow', 'title': 'Empty folder',
+                        'expires': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()})
+                    return
                 await request_route.fulfill(json={'mode': mode, 'title': 'Photos', 'media': {'name': 'movie.mp4', 'url': 'https://shared.example.test/s/test/media?path=movie.mp4', 'mime': 'video/mp4'}, 'expires': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
                     'cleanup': '/remove/test', 'entries': [{'name': f'{i}.jpg', 'url': f'https://shared.example.test/s/test/media?path={i}.jpg', 'mime': 'image/jpeg'} for i in range(3)]})
             elif '/s/test/media?' in request.url:
@@ -134,8 +139,36 @@ async def main():
         assert await page.evaluate('fakeCast.volume') is True
         await page.evaluate('''() => {fakeCast.player.playerState='IDLE';fakeCast.player.isMediaLoaded=false;fakeCast.remoteChanged();}''')
         await expect(page.locator('[data-cast-status]')).to_contain_text('Video ended')
+        await page.evaluate('''() => {
+          document.querySelector('#main').innerHTML='<button data-cast="/directories/test/cast" data-path="" data-mode="slideshow">Cast slideshow</button>';
+          document.dispatchEvent(new Event('htmx:afterSwap'));
+        }''')
+        await page.get_by_role('button', name='Cast slideshow').click()
+        await page.evaluate('fakeCast.choose()')
+        await expect(page.locator('[data-cast-status]')).to_contain_text('0.jpg')
+        timer = await page.evaluate('filesCast.operation.timer')
+        await page.get_by_role('button', name='Previous', exact=True).click()
+        assert await page.evaluate('filesCast.operation.timer') == timer
+        stopped = await page.evaluate('fakeCast.stopped')
+        created = state['create']
+        await page.get_by_role('button', name='Cast slideshow').click()
+        await page.evaluate('fakeCast.cancel()')
+        await expect(page.locator('[data-cast-status]')).to_contain_text('canceled')
+        await page.wait_for_function('(n) => fakeCast.stopped === n + 1', arg=stopped)
+        assert state['create'] == created, 'Replacement cancellation created a share'
+        removed = state['remove']
+        loads = await page.evaluate('fakeCast.loads.length')
+        await page.evaluate('''() => {
+          const button=document.querySelector('[data-cast]');
+          button.dataset.cast='/s/existing/cast';button.dataset.path='empty';
+        }''')
+        await page.get_by_role('button', name='Cast slideshow').click()
+        await page.evaluate('fakeCast.choose()')
+        await expect(page.locator('[data-cast-status]')).to_contain_text('no JPEG or PNG')
+        assert await page.evaluate('fakeCast.loads.length') == loads
+        assert state['remove'] == removed, 'Empty public folder attempted revocation'
         assert not errors, errors
         await browser.close()
-        print('PASS lazy SDK, CSP, picker cancellation, photo/video LOADs, controls, mobile, HTMX persistence, stop/revoke')
+        print('PASS SDK integration, controls, HTMX, replacement cancellation, boundary paging, and empty public folders')
 
 asyncio.run(main())

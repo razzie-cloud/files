@@ -86,3 +86,132 @@ test('hiding while playback is being prepared starts the slideshow paused',async
  response.resolve(f.data);await p;await flush();f.loads[0].resolve();await flush();f.c.visibility(false);
  assert.equal(f.c.operation.playing,false);await f.tick(20000);assert.equal(f.loads.length,1);
 });
+
+// Model the adapter's ownership check: Stop can affect only the operation
+// whose LOAD actually supplied the receiver's current media.
+function trackReceiver(f) {
+  let owner = null;
+  const load = f.adapter.load;
+  f.adapter.load = (op, entry) => load(op, entry).then(() => { owner = op; });
+  f.adapter.stop = async op => {
+    if (owner === op) { f.stopped.push(op); owner = null; }
+  };
+  return { get owner() { return owner; } };
+}
+for (const failure of ['picker cancellation', 'preparation failure']) {
+  test(`an aborted replacement stops previous owned media after ${failure}`, async () => {
+    const f = fixture();
+    const receiver = trackReceiver(f);
+    await f.begin();
+    const previous = f.c.operation;
+    f.loads[0].resolve();
+    await flush();
+    assert.equal(receiver.owner, previous);
+    const picker = deferred();
+    f.adapter.pick = () => picker.promise;
+    if (failure === 'preparation failure') f.api.create = async () => { throw new Error('unavailable'); };
+    const replacement = f.c.start({});
+    await flush(); // The old operation's scheduled Stop sees the replacement.
+    if (failure === 'picker cancellation') picker.reject({ cancelled: true });
+    else picker.resolve({});
+    await replacement;
+    await flush();
+    assert.equal(f.c.operation, null);
+    assert.equal(receiver.owner, null);
+    assert.deepEqual(f.stopped, [previous]);
+    assert.deepEqual(f.removed, ['/remove/one']);
+  });
+}
+test('canceling a replacement stops an old LOAD that settles after cancellation', async () => {
+  const f = fixture();
+  const receiver = trackReceiver(f);
+  await f.begin();
+  const previous = f.c.operation;
+  const picker = deferred();
+  f.adapter.pick = () => picker.promise;
+  const replacement = f.c.start({});
+  picker.reject({ cancelled: true });
+  await replacement;
+  assert.equal(f.stopped.length, 0);
+  f.loads[0].resolve();
+  await flush();
+  assert.equal(receiver.owner, null);
+  assert.deepEqual(f.stopped, [previous]);
+});
+test('late aborted-replacement work cannot stop newer media', async () => {
+  const f = fixture();
+  const receiver = trackReceiver(f);
+  await f.begin();
+  f.loads[0].resolve();
+  await flush();
+  const response = deferred();
+  f.api.create = () => response.promise;
+  const replacement = f.c.start({});
+  await flush();
+  const latestData = structuredClone(f.data);
+  latestData.cleanup = '/remove/latest';
+  latestData.entries.forEach(entry => { entry.url += '-latest'; });
+  f.api.create = async () => latestData;
+  await f.c.start({});
+  await flush();
+  const latest = f.c.operation;
+  f.loads[1].resolve();
+  await flush();
+  const abandonedData = structuredClone(f.data);
+  abandonedData.cleanup = '/remove/abandoned';
+  response.resolve(abandonedData);
+  await replacement;
+  await flush();
+  assert.equal(receiver.owner, latest);
+  assert.equal(f.stopped.length, 0);
+  assert.deepEqual(f.removed, ['/remove/one', '/remove/abandoned']);
+  f.c.stop();
+  await flush();
+  assert.equal(receiver.owner, null);
+  assert.deepEqual(f.stopped, [latest]);
+});
+test('an empty public manifest with omitted entries shows the no-pictures message', async () => {
+  const f = fixture();
+  delete f.data.entries; // Matches the server's omitempty JSON representation.
+  delete f.data.cleanup; // Existing public shares must never be revoked.
+  await f.begin();
+  assert.equal(f.c.operation, null);
+  assert.match(f.c.message, /no JPEG or PNG/);
+  assert.equal(f.loads.length, 0);
+  assert.equal(f.removed.length, 0);
+});
+test('Previous at the first picture preserves the scheduled advancement', async () => {
+  const f = fixture();
+  await f.begin();
+  f.loads[0].resolve();
+  await flush();
+  await f.tick(4000);
+  const timer = f.c.operation.timer;
+  f.c.move(-1);
+  assert.equal(f.c.operation.playing, true);
+  assert.equal(f.c.operation.timer, timer);
+  await f.tick(5999);
+  assert.equal(f.loads.length, 1);
+  await f.tick(1);
+  assert.equal(f.loads.length, 2);
+  assert.equal(f.loads[1].entry.name, '1.jpg');
+});
+test('Next at the last picture preserves automatic slideshow completion', async () => {
+  const f = fixture();
+  await f.begin();
+  f.loads[0].resolve();
+  await flush();
+  f.c.move(3);
+  await flush();
+  f.loads[1].resolve();
+  await flush();
+  const timer = f.c.operation.timer;
+  f.c.move(1);
+  assert.equal(f.c.operation.timer, timer);
+  assert.equal(f.c.operation.playing, true);
+  await f.tick(10000);
+  assert.equal(f.c.operation.playing, false);
+  assert.match(f.c.message, /Slideshow finished/);
+  assert.equal(f.loads.length, 2);
+  assert.equal(f.timers.size, 1); // Expiry remains enforced after completion.
+});
