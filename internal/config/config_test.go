@@ -90,3 +90,34 @@ func TestShareOriginValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestCastShareTTL(t *testing.T) {
+	env := func(key string) string {
+		switch key {
+		case "ORIGIN":
+			return "https://files.example.com"
+		case "POSTGRES_URI":
+			return "postgres://u:p@localhost/files"
+		}
+		return ""
+	}
+	cfg, err := Load(nil, env)
+	if err != nil || cfg.CastShareTTL.String() != "6h0m0s" {
+		t.Fatal("default TTL", cfg.CastShareTTL, err)
+	}
+	for _, value := range []string{"1s", "1h", "24h"} {
+		if _, err := Load([]string{"--cast-share-ttl", value}, env); err != nil {
+			t.Fatal(value, err)
+		}
+	}
+	for _, value := range []string{"0", "-1h", "24h1s", "forever"} {
+		if _, err := Load(nil, func(key string) string {
+			if key == "CAST_SHARE_TTL" {
+				return value
+			}
+			return env(key)
+		}); err == nil {
+			t.Fatal("invalid TTL", value)
+		}
+	}
+}

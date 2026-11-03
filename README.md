@@ -70,7 +70,7 @@ shared-files.example.com {
 Use **Share** beside a file/folder, or **Sharing** in the directory toolbar.
 Leave the path empty and select Directory to share the entire mapped directory.
 Owners can list/copy links and revoke them from this page, including on read-only
-storage connections. Public pages allow browsing and downloading only, with
+storage connections. Public pages allow read-only browsing, downloading, previewing, and casting, with
 pagination and HTTP range downloads; rclone crypt decryption works normally.
 Directory shares include descendants and future contents. Links are live views:
 replacing an object at the same path changes what recipients download.
@@ -106,6 +106,66 @@ local cache; other replicas see revocation/deletion/credential changes within
 30 seconds. Downloads already in flight may finish. Responses use `no-store` and
 `no-referrer`, so HTML and passwords are not cached in the browser.
 
+## Google Cast
+
+Choose **Cast** beside an MP4, or **Cast slideshow** above a folder listing,
+including the directory root. The sender uses Google's Default Media Receiver
+without registration, transcoding, or a custom receiver. H.264 MP4 is the
+compatibility baseline; HEVC depends on the receiver and the file's codecs.
+JPEG/PNG slideshows include direct children across all listing pages, sorted by
+filename, within `MAX_LIST_ENTRIES`. Originals are delivered unchanged; large
+photos, portrait orientation, repeated image loads, and receiver idle behavior
+still need real-device validation.
+
+Use HTTPS in supported desktop/Android Chrome, with the browser and receiver on
+the same reachable network. The receiver must reach the public `SHARE_ORIGIN`
+host and Google services; loopback-only development URLs cannot serve a TV.
+The SDK is loaded only when a casting action is shown. Local app code remains
+embedded; CSP permits specific gstatic sender script paths. Media CORS permits
+`https://www.gstatic.com` and configured management/share origins without
+credentials. Actual SDK dependencies and receiver CORS requests remain hardware
+acceptance items; do not broaden management CORS to fix receiver requests.
+
+Device selection precedes share creation, so canceling creates no share.
+Authenticated casting creates one ordinary passwordless share, visible in
+**Sharing**, with a server-selected `CAST_SHARE_TTL` deadline (default `6h`,
+positive and at most `24h`; same configuration on every replica). Folder shares
+include descendants, non-image files, and future contents even though slideshow
+entries include only the current folder's pictures. Stop, replacement, or failed
+startup attempts share revocation. A lost response or closed tab relies on expiry;
+expired records remain visible for manual removal. Metadata creation works on
+read-only directories and connections.
+
+Existing public shares have the same actions. Unlock password-protected shares
+first: the sender delegates a signed ticket for the exact video or slideshow
+folder. The ticket expires by the earliest of `CAST_SHARE_TTL`, the password
+session deadline, or the original share's expiry. Public casting creates no
+persisted share, and Stop never revokes the owner's original share. A delegated
+ticket remains valid until its deadline or parent revocation. Existing cache
+rules bound cross-replica revocation to 30 seconds; delivered bytes and pictures
+cannot be recalled.
+
+The document-local controller survives HTMX navigation. Video supports normal
+remote play/pause, seeking, volume, and Stop. Slideshows support previous/next,
+retry, pause/resume, 2–300 seconds per picture (default 10), shuffle, and loop.
+Only one LOAD is active; rapid selections coalesce. A failed picture pauses for
+retry/skip; authorization failure stops playback. Hiding the page pauses timed
+advancement; return and explicitly Resume. Reloading loses slideshow state,
+and reconnection does not silently restart timers or create shares.
+
+Protocol: form POST `/directories/{id}/cast` creates an owner playback description;
+form POST `/s/{share}/cast` describes public playback. Capability GET/HEAD
+`/s/{share}/media?path=...` delivers validated MP4/JPEG/PNG with ranges; GET
+`/s/{share}/slideshow?path=...` returns the bounded picture manifest. Password
+capabilities add a `ticket` query parameter. URLs/tickets are credentials: keep
+in memory and out of logs or persistent browser storage. Header validation reads
+at most 64 KiB, and does not establish full-file integrity or codec support.
+Ordinary download/preview semantics are unchanged.
+
+Sender tests: `node tests/cast-controller.test.cjs` (Node 22+). Browser adapter
+checks: `python tests/cast-browser.py` with Playwright and Chromium installed.
+Neither mocks nor SDK acknowledgments prove rendering on a physical receiver.
+
 ## Configuration
 
 Each environment variable also has a kebab-case CLI flag, for example
@@ -122,6 +182,7 @@ Each environment variable also has a kebab-case CLI flag, for example
 | `IMPORT_SECRETS_DIR` | Optional one-time import of a legacy secret directory (`--import-secrets-dir`) |
 | `MAX_UPLOAD_BYTES` | Plaintext per-file limit, default 1 GiB |
 | `MAX_CONCURRENT_UPLOADS` | Per-process upload slots, default four |
+| `CAST_SHARE_TTL` | Temporary playback lifetime, default `6h`, positive and at most `24h` (`--cast-share-ttl`) |
 | `MAX_LIST_ENTRIES` | Entries collected per directory, default 10,000 |
 | `S3_ALLOWED_PRIVATE_ENDPOINTS` | Comma-separated exact host:port exceptions, empty by default |
 | `S3_ALLOW_HTTP` | Default false; HTTP also requires an explicit endpoint exception |

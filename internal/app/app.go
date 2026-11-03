@@ -63,7 +63,13 @@ type view struct {
 }
 
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
-	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base, "mediaKind": mediaKind}).ParseFS(web.Assets, "templates.html")
+	if cfg.CastShareTTL == 0 {
+		cfg.CastShareTTL = 6 * time.Hour
+	}
+	if cfg.CastShareTTL <= 0 || cfg.CastShareTTL > 24*time.Hour {
+		return nil, errors.New("invalid Cast share lifetime")
+	}
+	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base, "mediaKind": mediaKind, "castType": castType}).ParseFS(web.Assets, "templates.html")
 	if e != nil {
 		return nil, e
 	}
@@ -117,6 +123,7 @@ func (s *Server) Handler() http.Handler {
 	handle("POST /directories/{id}/rmdir", s.mutate)
 	handle("GET /directories/{id}/shares", s.shareForm)
 	handle("POST /directories/{id}/shares", s.createShare)
+	handle("POST /directories/{id}/cast", s.createCast)
 	handle("POST /directories/{id}/shares/{share}/remove", s.removeShare)
 	public := s.publicHandler()
 	return logging.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +134,11 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		// SDK execution is opt-in through capable views; these path-scoped
+		// exceptions also allow an initial document to navigate there via HTMX.
+		if s.Config.ShareOrigin != "" {
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://www.gstatic.com/cv/js/sender/ https://www.gstatic.com/cast/sdk/libs/sender/ https://www.gstatic.com/eureka/clank/; connect-src 'self' "+s.Config.ShareOrigin+"; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		}
 		// Select public routes by the actual Host, never by forwarded identity.
 		if s.Config.ShareOrigin != "" && sameHost(r.Host, s.Config.ShareOrigin) {
 			public.ServeHTTP(w, r)
@@ -876,6 +888,10 @@ func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storag
 		s.operationError(w, r, e)
 		return
 	}
+	s.serveFile(w, r, fs, key, info, contentType, disposition)
+}
+
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, fs storage.FS, key string, info storage.Entry, contentType, disposition string) {
 	start, end, partial, e := parseRange(r.Header.Get("Range"), info.Size)
 	if e != nil {
 		w.Header().Set("Content-Range", "bytes */"+strconv.FormatInt(info.Size, 10))
