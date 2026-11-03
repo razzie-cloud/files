@@ -17,6 +17,7 @@ import (
 
 type Config struct {
 	Port, Origin, ShareOrigin, PostgresURI, PostgresURIFrom, PasswordFile, ImportSecretsDir string
+	CastShareTTL                                                                            time.Duration
 	PrivateEndpoints                                                                        string
 	AllowHTTP                                                                               bool
 	MaxUploadBytes                                                                          int64
@@ -67,6 +68,15 @@ func Load(args []string, env func(string) string) (Config, error) {
 			return c, errors.New("invalid S3_ALLOW_HTTP")
 		}
 	}
+	ttl := env("CAST_SHARE_TTL")
+	if ttl == "" {
+		ttl = "6h"
+	}
+	duration, err := time.ParseDuration(ttl)
+	if err != nil {
+		return c, errors.New("invalid CAST_SHARE_TTL")
+	}
+	f.DurationVar(&c.CastShareTTL, "cast-share-ttl", duration, "temporary playback lifetime (maximum 24h)")
 	f.BoolVar(&c.AllowHTTP, "s3-allow-http", h, "allow HTTP for explicit private endpoint exceptions")
 	f.Int64Var(&c.MaxUploadBytes, "max-upload-bytes", u, "maximum plaintext file size")
 	f.IntVar(&c.MaxUploads, "max-concurrent-uploads", int(n), "concurrent uploads per process")
@@ -76,6 +86,9 @@ func Load(args []string, env func(string) string) (Config, error) {
 	}
 	if f.NArg() != 0 {
 		return c, errors.New("unexpected arguments")
+	}
+	if c.CastShareTTL <= 0 || c.CastShareTTL > 24*time.Hour {
+		return c, errors.New("CAST_SHARE_TTL must be positive and at most 24h")
 	}
 	p, e := strconv.Atoi(c.Port)
 	if e != nil || p < 1 || p > 65535 {

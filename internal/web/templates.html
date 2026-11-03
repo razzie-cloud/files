@@ -2,9 +2,9 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"historyCacheSize":0,"refreshOnHistoryMiss":true}'>
 <title>Files · Razcloud</title><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css">
-<script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script></head>
+<script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script>{{if .ShareEnabled}}<script defer src="/static/cast-controller.js"></script><script defer src="/static/cast.js"></script>{{end}}</head>
 <body><header class="container"><nav><ul><li>{{if .Public}}Razcloud <strong>Shared files</strong>{{else}}<a href="/" class="brand">Razcloud <strong>Files</strong></a>{{end}}</li></ul>{{if not .Public}}<ul><li><a href="/connections">Storage connections</a></li><li>{{.User.Name}}</li></ul>{{end}}</nav></header>
-<main id="main" class="container">{{template "content" .}}</main><footer class="container"><small>{{if .Public}}Shared read-only access.{{else}}Private storage. Your files stay in your buckets.{{end}}</small></footer></body></html>{{end}}
+<main id="main" class="container">{{template "content" .}}</main>{{if .ShareEnabled}}{{template "cast-controller" .}}{{end}}<footer class="container"><small>{{if .Public}}Shared read-only access.{{else}}Private storage. Your files stay in your buckets.{{end}}</small></footer></body></html>{{end}}
 
 {{define "error"}}<article role="alert"><h2>Unable to complete the request</h2><p>{{.}}</p><p><button type="button" class="secondary" data-back>Return to the previous page</button> <a href="/">Directories</a></p></article>{{end}}
 
@@ -58,6 +58,7 @@
 {{if eq .Page "browse"}}
 <div class="heading"><div><small>{{.Directory.Bucket}}</small><h1>{{.Directory.Name}}</h1><span class="badge">{{if .Writable}}Writable{{else}}Read-only{{end}}</span> <span class="badge">{{if eq .Directory.EncryptionMode "rclone_crypt"}}rclone encrypted{{else}}Plain S3{{end}}</span></div><div>{{if .ShareEnabled}}<a href="/directories/{{.Directory.ID}}/shares?path={{urlquery .Path}}&amp;kind=directory">Sharing</a> · {{end}}<a href="/directories/{{.Directory.ID}}/edit">Directory settings</a></div></div>
 <nav aria-label="Breadcrumb"><ul><li><a href="/">Directories</a></li>{{range .Crumbs}}<li><a href="{{.URL}}">{{.Name}}</a></li>{{end}}</ul></nav>
+{{if .ShareEnabled}}<p><button type="button" class="secondary outline" data-cast="/directories/{{.Directory.ID}}/cast" data-path="{{.Path}}" data-mode="slideshow" disabled>Cast slideshow</button> <small>JPEG/PNG in this folder. Keep this page active for timed playback.</small></p>{{end}}
 {{if .Writable}}<div class="actions"><details><summary role="button">Upload file</summary><article>
 <p>Destination: {{.Directory.Name}} / {{.Path}}<br>{{if eq .Directory.EncryptionMode "rclone_crypt"}}Encrypted automatically using this directory's rclone crypt settings.{{else}}Stored without rclone encryption.{{end}} Maximum {{size .UploadLimit}}.</p>
 <form method="post" enctype="multipart/form-data" action="/directories/{{.Directory.ID}}/upload?path={{urlquery .Path}}&amp;revision={{.Directory.Revision}}" hx-post="/directories/{{.Directory.ID}}/upload?path={{urlquery .Path}}&amp;revision={{.Directory.Revision}}" hx-encoding="multipart/form-data" hx-target="#main" data-upload><label>File<input type="file" name="file" required></label><progress value="0" max="100" hidden></progress><button>Upload file</button><button type="button" class="secondary" data-cancel-upload>Cancel upload</button></form>
@@ -65,7 +66,7 @@
 <details><summary>New folder</summary><form method="post" action="/directories/{{.Directory.ID}}/mkdir" hx-post="/directories/{{.Directory.ID}}/mkdir" hx-target="#main"><input type="hidden" name="revision" value="{{.Directory.Revision}}"><label>Relative folder path<input name="path" value="{{if .Path}}{{.Path}}/{{end}}" required placeholder="new-folder"></label><button>Create folder</button></form></details></div>{{end}}
 <div class="overflow-auto"><table><thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead><tbody>{{if .Parent}}<tr><td><a href="{{.Parent}}">↑ Parent directory</a></td><td></td><td></td></tr>{{end}}
 {{range .Entries}}<tr><td>{{if .Directory}}<a href="/directories/{{$.Directory.ID}}?path={{urlquery .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td><div class="file-actions">{{if not .Directory}}{{if mediaKind .Name}}<a role="button" class="secondary outline" href="/directories/{{$.Directory.ID}}/download?path={{urlquery .Path}}&amp;inline=1" data-preview="{{mediaKind .Name}}" data-name="{{.Name}}">Open</a>{{end}}<a role="button" class="secondary outline" href="/directories/{{$.Directory.ID}}/download?path={{urlquery .Path}}">Download</a>{{end}}
-{{if $.ShareEnabled}} <a role="button" class="secondary outline" href="/directories/{{$.Directory.ID}}/shares?path={{urlquery .Path}}&amp;kind={{if .Directory}}directory{{else}}file{{end}}">Share</a>{{end}}
+{{if $.ShareEnabled}}{{if eq (castType .Name) "video/mp4"}}{{if not .Directory}}<button type="button" class="secondary outline" data-cast="/directories/{{$.Directory.ID}}/cast" data-path="{{.Path}}" data-mode="video" disabled>Cast</button>{{end}}{{end}} <a role="button" class="secondary outline" href="/directories/{{$.Directory.ID}}/shares?path={{urlquery .Path}}&amp;kind={{if .Directory}}directory{{else}}file{{end}}">Share</a>{{end}}
 {{if $.Writable}}<details><summary role="button" class="secondary outline">{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</summary><form method="post" action="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-post="/directories/{{$.Directory.ID}}/{{if .Directory}}rmdir{{else}}delete-file{{end}}" hx-target="#main"><input type="hidden" name="path" value="{{.Path}}"><input type="hidden" name="revision" value="{{$.Directory.Revision}}"><label><input type="checkbox" name="confirm" required>Confirm {{.Name}}</label><button class="secondary">{{if .Directory}}Remove empty folder{{else}}Delete file{{end}}</button></form></details>{{end}}</div></td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}</tbody></table></div>
 <nav aria-label="Pages"><ul>{{if .Previous}}<li><a href="{{.Previous}}">← Previous</a></li>{{end}}</ul><ul>{{if .Next}}<li><a href="{{.Next}}">Next →</a></li>{{end}}</ul></nav>
 {{end}}
@@ -89,9 +90,10 @@
 {{end}}
 {{if eq .Page "shared"}}
 <div class="heading"><div><small>SHARED FILES</small><h1>{{.Message}}</h1><p>Read-only access{{if .Path}} · {{.Path}}{{end}}</p></div>{{range .Crumbs}}<a href="{{.URL}}">Share root</a>{{end}}</div>
+{{if .ShareDirectory}}<p><button type="button" class="secondary outline" data-cast="{{.ShareURL}}/cast" data-path="{{.Path}}" data-mode="slideshow" disabled>Cast slideshow</button> <small>JPEG/PNG in this folder. Keep this page active for timed playback.</small></p>{{end}}
 <div class="overflow-auto"><table><thead><tr><th>Name</th><th>Size</th><th>Actions</th></tr></thead><tbody>
 {{if .Parent}}<tr><td><a href="{{.Parent}}">↑ Parent directory</a></td><td></td><td></td></tr>{{end}}
-{{range .Entries}}<tr><td>{{if .Directory}}<a href="{{$.ShareURL}}?path={{urlquery .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td><div class="file-actions">{{if not .Directory}}{{if mediaKind .Name}}<a role="button" class="secondary outline" href="{{$.ShareURL}}/download?path={{urlquery .Path}}&amp;inline=1" data-preview="{{mediaKind .Name}}" data-name="{{.Name}}">Open</a>{{end}}<a role="button" class="secondary outline" href="{{$.ShareURL}}/download?path={{urlquery .Path}}">Download</a>{{end}}</div></td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}
+{{range .Entries}}<tr><td>{{if .Directory}}<a href="{{$.ShareURL}}?path={{urlquery .Path}}">▸ {{.Name}}/</a>{{else}}{{.Name}}{{end}}</td><td>{{if .Directory}}—{{else}}{{size .Size}}{{end}}</td><td><div class="file-actions">{{if not .Directory}}{{if mediaKind .Name}}<a role="button" class="secondary outline" href="{{$.ShareURL}}/download?path={{urlquery .Path}}&amp;inline=1" data-preview="{{mediaKind .Name}}" data-name="{{.Name}}">Open</a>{{end}}<a role="button" class="secondary outline" href="{{$.ShareURL}}/download?path={{urlquery .Path}}">Download</a>{{if eq (castType .Name) "video/mp4"}}<button type="button" class="secondary outline" data-cast="{{$.ShareURL}}/cast" data-path="{{.Path}}" data-mode="video" disabled>Cast</button>{{end}}{{end}}</div></td></tr>{{else}}<tr><td colspan="3">This folder is empty.</td></tr>{{end}}
 </tbody></table></div><nav aria-label="Pages"><ul>{{if .Previous}}<li><a href="{{.Previous}}">← Previous</a></li>{{end}}</ul><ul>{{if .Next}}<li><a href="{{.Next}}">Next →</a></li>{{end}}</ul></nav>
 {{end}}
 {{end}}
@@ -105,4 +107,14 @@
 <footer><div class="media-navigation"><button type="button" class="secondary" data-preview-previous>← Previous</button><span data-preview-position aria-live="polite"></span><button type="button" class="secondary" data-preview-next>Next →</button></div><a role="button" class="secondary outline" data-preview-download>Download</a></footer>
 </article>
 </dialog>
+{{end}}
+
+{{define "cast-controller"}}
+<aside id="cast-controller" class="container" aria-label="Cast playback controller" hidden><article>
+<p data-cast-status role="status" aria-live="polite"></p><small data-cast-expiry></small>
+<div data-cast-controls hidden><div class="file-actions"><button type="button" data-cast-toggle>Pause</button><button type="button" class="secondary" data-cast-stop>Stop</button></div>
+<div data-cast-photos hidden><div class="file-actions"><button type="button" class="secondary" data-cast-previous>Previous</button><button type="button" class="secondary" data-cast-next>Next</button><button type="button" class="secondary outline" data-cast-retry>Retry</button></div>
+<label>Seconds per picture<input type="number" min="2" max="300" step="1" value="10" data-cast-interval></label><label><input type="checkbox" data-cast-shuffle>Shuffle</label><label><input type="checkbox" data-cast-loop>Loop</label></div>
+<div data-cast-video hidden><label>Seek<input type="range" min="0" max="100" step="0.1" data-cast-seek disabled></label><small data-cast-time></small><label>Volume<input type="range" min="0" max="1" step="0.01" data-cast-volume></label><small>Playback depends on the receiver's codec support. H.264 MP4 is the compatibility baseline; no conversion is performed.</small></div>
+</div></article></aside>
 {{end}}

@@ -16,3 +16,11 @@ body:has(#media-preview[open]){overflow:hidden}
 .file-actions>details>summary::after{display:none;background-image:none}
 .file-actions>details[open]>summary{margin-bottom:.75rem}
 .file-actions>details>form{width:18rem;white-space:normal}
+.file-actions>button{flex:0 0 auto;width:auto;margin:0;padding:.35rem .65rem;font-size:.875rem;line-height:1.25;white-space:nowrap}
+#cast-controller{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:20;max-width:55rem;width:calc(100% - 2rem);max-height:50vh;overflow:auto}
+#cast-controller article{margin:0;padding:1rem;box-shadow:0 .25rem 2rem #0004}
+#cast-controller p{margin-bottom:.5rem;overflow-wrap:anywhere}
+#cast-controller .file-actions{flex-wrap:wrap;margin:.5rem 0}
+#cast-controller [data-cast-photos]{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+#cast-controller label{font-size:.875rem;margin:0}
+#cast-controller input[type=number]{width:6rem;margin:0}

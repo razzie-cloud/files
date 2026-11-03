@@ -148,6 +148,10 @@ func (s *Server) removeShare(w http.ResponseWriter, r *http.Request) {
 	}
 	logging.For(r.Context()).Info("Share revoked", "event", "share.revoked", "directory_id", d.ID)
 	s.shares.invalidate()
+	if r.Header.Get("Accept") == "application/json" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	s.done(w, r, "/directories/"+d.ID+"/shares")
 }
 
@@ -160,6 +164,9 @@ func (s *Server) publicHandler() http.Handler {
 	handle("GET /s/{share}", s.publicShare)
 	handle("GET /s/{share}/download", s.publicShare)
 	handle("POST /s/{share}/unlock", s.publicShare)
+	handle("POST /s/{share}/cast", s.publicCast)
+	handle("GET /s/{share}/media", s.publicMedia)
+	handle("GET /s/{share}/slideshow", s.publicSlideshow)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Neither proxy identity headers nor admin routes have meaning here.
 		if r.Method == http.MethodPost {
@@ -173,7 +180,7 @@ func (s *Server) publicHandler() http.Handler {
 				return
 			}
 		}
-		if r.Method == http.MethodGet && !strings.HasSuffix(r.URL.Path, "/download") {
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasSuffix(r.URL.Path, "/download") && !strings.HasSuffix(r.URL.Path, "/media") {
 			ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 			defer cancel()
 			r = r.WithContext(ctx)
@@ -311,7 +318,7 @@ func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 	if v.Path == "" {
 		name = snapshot.Directory.Name
 	}
-	page := view{Page: "shared", ShareURL: base, Path: relative, Message: name}
+	page := view{Page: "shared", ShareURL: base, Path: relative, Message: name, ShareDirectory: v.IsDirectory}
 	if v.IsDirectory {
 		entries, err := fs.List(r.Context(), key)
 		if errors.Is(err, storage.ErrNotFound) && key == "" {
