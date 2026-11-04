@@ -249,8 +249,17 @@ a view only changes its name/read-only restriction. Changing a crypt password
 would not migrate existing objects. Make a new mapping for a different setup.
 Deleting mappings or connections never deletes bucket contents or recovery secrets.
 
-Default uploads reject existing targets. The separate replace action requires
-confirmation. Advisory locks serialize service writes using physical keys across
+Select one or more files in **Upload files** to upload them to the current folder,
+up to 100 files per request. The configured upload size limit applies to each
+plaintext file, not the combined selection. Files stream sequentially without
+disk spooling. If a file fails, the request stops and reports how many files
+completed; those files remain in storage. Refresh the directory before retrying
+the remaining files. Progress and cancellation apply to the whole request;
+canceling does not remove files that already completed.
+
+Default uploads reject existing targets, including duplicate filenames in a
+selection. The separate single-file replace action requires confirmation.
+Advisory locks serialize service writes using physical keys across
 replicas; external clients/different connections can race. There is no universal
 atomic create-if-absent guarantee. Interrupted uploads can have uncertain completion;
 refresh before retrying. Configure provider lifecycle cleanup of abandoned

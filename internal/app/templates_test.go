@@ -90,3 +90,57 @@ func TestBrowsePathURLs(t *testing.T) {
 		})
 	}
 }
+
+func TestUploadFileSelection(t *testing.T) {
+	srv, err := New(config.Config{}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, writable := range []bool{true, false} {
+		var body bytes.Buffer
+		err := srv.templates.ExecuteTemplate(&body, "page", view{
+			Page: "browse", Directory: &store.Directory{ID: testOwner}, Writable: writable,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, err := html.Parse(strings.NewReader(body.String()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		inputs := 0
+		var visit func(*html.Node, bool)
+		visit = func(n *html.Node, replace bool) {
+			attrs := map[string]string{}
+			for _, attr := range n.Attr {
+				attrs[attr.Key] = attr.Val
+			}
+			if n.Type == html.ElementNode && n.Data == "form" {
+				u, err := url.Parse(attrs["action"])
+				if err != nil {
+					t.Fatal(err)
+				}
+				replace = u.Query().Get("replace") == "yes"
+			}
+			if n.Type == html.ElementNode && n.Data == "input" && attrs["type"] == "file" {
+				inputs++
+				_, multiple := attrs["multiple"]
+				_, required := attrs["required"]
+				if multiple == replace || !required || attrs["name"] != "file" {
+					t.Errorf("invalid file selection (replace=%v): %v", replace, attrs)
+				}
+			}
+			for child := n.FirstChild; child != nil; child = child.NextSibling {
+				visit(child, replace)
+			}
+		}
+		visit(doc, false)
+		want := 0
+		if writable {
+			want = 2
+		}
+		if inputs != want {
+			t.Errorf("file inputs: %d, want %d (writable=%v)", inputs, want, writable)
+		}
+	}
+}

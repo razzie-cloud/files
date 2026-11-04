@@ -55,6 +55,8 @@ type view struct {
 	Crumbs                                      []crumb
 	Writable                                    bool
 	UploadLimit                                 int64
+	UploadFileLimit, UploadCompleted            int
+	ReturnURL                                   string
 	ShareEnabled                                bool
 	Public                                      bool
 	ShareDirectory                              bool
@@ -186,6 +188,7 @@ func user(r *http.Request) identity.User {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 	v.User = user(r)
 	v.UploadLimit = s.Config.MaxUploadBytes
+	v.UploadFileLimit = maxUploadFiles
 	v.ShareEnabled = s.Config.ShareOrigin != ""
 	v.Public = v.ShareEnabled && sameHost(r.Host, s.Config.ShareOrigin)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -199,6 +202,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 	}
 }
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, e error, status int) {
+	s.failView(w, r, e, status, view{})
+}
+func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, status int, v view) {
 	message := "Request failed. Check the storage configuration and try again."
 	switch {
 	case errors.Is(e, store.ErrNotFound), errors.Is(e, storage.ErrNotFound):
@@ -235,7 +241,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, e error, status in
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	s.render(w, r, view{Page: "error", Message: message})
+	v.Page, v.Message = "error", message
+	s.render(w, r, v)
 }
 func (s *Server) done(w http.ResponseWriter, r *http.Request, destination string) {
 	if r.Header.Get("HX-Request") == "true" {
@@ -741,6 +748,9 @@ func (s *Server) mutate(w http.ResponseWriter, r *http.Request) {
 	}
 	s.done(w, r, "/directories/"+d.ID+"?path="+url.QueryEscape(parent))
 }
+
+const maxUploadFiles = 100
+
 func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	d, c, fs, e := s.open(r, true)
@@ -756,7 +766,12 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errors.New("All upload slots are busy. Try again shortly."), 429)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, s.Config.MaxUploadBytes+(64<<10))
+	query := r.URL.Query()
+	fileLimit := maxUploadFiles
+	if query.Get("replace") == "yes" {
+		fileLimit = 1
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, int64(fileLimit)*(s.Config.MaxUploadBytes+(64<<10)))
 	reader, e := r.MultipartReader()
 	if e != nil {
 		s.fail(w, r, errors.New("Expected a multipart upload."), 422)
@@ -764,8 +779,7 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// Destination and revision are URL form fields, so file-part order never
 	// controls authorization and the body can stream without disk spooling.
-	query := r.URL.Query()
-	key, e := storage.Path(query.Get("path"), true)
+	parent, e := storage.Path(query.Get("path"), true)
 	if e != nil {
 		s.fail(w, r, e, 422)
 		return
@@ -775,52 +789,88 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, store.ErrConflict, 409)
 		return
 	}
-	part, e := reader.NextPart()
-	if e != nil {
-		s.fail(w, r, errors.New("Choose a file to upload."), 422)
+	destination := "/directories/" + d.ID + "?path=" + url.QueryEscape(parent)
+	completed := 0
+	var totalBytes int64
+	fail := func(err error, status int) {
+		s.failView(w, r, err, status, view{UploadCompleted: completed, ReturnURL: destination})
+	}
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			var maxBytes *http.MaxBytesError
+			if errors.As(err, &maxBytes) {
+				fail(storage.ErrTooLarge, 413)
+			} else {
+				fail(errors.New("Incomplete or invalid multipart upload. Refresh the directory before retrying."), 422)
+			}
+			return
+		}
+		if completed == fileLimit {
+			message := "Choose no more than " + strconv.Itoa(fileLimit) + " files per upload."
+			if fileLimit == 1 {
+				message = "Choose one replacement file."
+			}
+			fail(errors.New(message), 422)
+			return
+		}
+		_, parameters, parseErr := mime.ParseMediaType(part.Header.Get("Content-Disposition"))
+		if parseErr != nil || strings.ContainsAny(parameters["filename"], "/\\") {
+			fail(storage.ErrInvalidPath, 422)
+			return
+		}
+		if part.FormName() != "file" || part.FileName() == "" {
+			fail(errors.New("Choose files to upload."), 422)
+			return
+		}
+		key, err := storage.Child(parent, part.FileName())
+		if err != nil {
+			fail(err, 422)
+			return
+		}
+		limited := &limitReader{Reader: part, remaining: s.Config.MaxUploadBytes}
+		err = s.uploadFile(r, d, c, fs, key, limited, query.Get("replace") == "yes")
+		if limited.exceeded {
+			err = storage.ErrTooLarge
+		}
+		if err != nil {
+			status := 502
+			if errors.Is(err, errReadOnly) {
+				status = 403
+			}
+			fail(err, status)
+			return
+		}
+		completed++
+		totalBytes += s.Config.MaxUploadBytes - limited.remaining
+	}
+	if completed == 0 {
+		fail(errors.New("Choose files to upload."), 422)
 		return
 	}
-	defer part.Close()
-	_, parameters, parseErr := mime.ParseMediaType(part.Header.Get("Content-Disposition"))
-	if parseErr != nil || strings.ContainsAny(parameters["filename"], "/\\") {
-		s.fail(w, r, storage.ErrInvalidPath, 422)
-		return
-	}
-	if part.FormName() != "file" || part.FileName() == "" {
-		s.fail(w, r, errors.New("Choose one file to upload."), 422)
-		return
-	}
-	key, e = storage.Child(key, part.FileName())
-	if e != nil {
-		s.fail(w, r, e, 422)
-		return
-	}
+	logging.For(r.Context()).Debug("Upload completed", "event", "storage.upload_completed", "files", completed, "bytes", totalBytes, "duration_ms", time.Since(start).Milliseconds())
+	s.done(w, r, destination)
+}
+
+// Release each object's lock before reading the next part, and recheck access
+// and configuration for every file in the selection.
+func (s *Server) uploadFile(r *http.Request, d store.Directory, c store.Connection, fs storage.FS, key string, in io.Reader, replace bool) error {
 	unlock, e := s.writeLock(r, d, c, fs, key)
 	if e != nil {
-		s.operationError(w, r, e)
-		return
+		return e
 	}
 	defer unlock()
 	_, e = fs.Stat(r.Context(), key)
-	if e == nil && query.Get("replace") != "yes" {
-		s.fail(w, r, store.ErrConflict, 409)
-		return
+	if e == nil && !replace {
+		return store.ErrConflict
 	}
 	if e != nil && !errors.Is(e, storage.ErrNotFound) {
-		s.operationError(w, r, e)
-		return
+		return e
 	}
-	limited := &limitReader{Reader: part, remaining: s.Config.MaxUploadBytes}
-	if e = fs.Put(r.Context(), key, limited); e != nil {
-		if limited.exceeded {
-			s.fail(w, r, storage.ErrTooLarge, 413)
-		} else {
-			s.operationError(w, r, e)
-		}
-		return
-	}
-	logging.For(r.Context()).Debug("Upload completed", "event", "storage.upload_completed", "bytes", s.Config.MaxUploadBytes-limited.remaining, "duration_ms", time.Since(start).Milliseconds())
-	s.done(w, r, "/directories/"+d.ID+"?path="+url.QueryEscape(query.Get("path")))
+	return fs.Put(r.Context(), key, in)
 }
 
 type limitReader struct {
