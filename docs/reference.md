@@ -16,6 +16,26 @@ The Go service embeds **rclone v1.75.2** as a library. It composes the S3 backen
 with optional rclone `crypt`, with no subprocess, RC API, or custom encryption.
 The executable embeds HTMX 2.0.8, PicoCSS 2.1.1, templates, and local assets.
 
+The desktop interface has sidebar navigation, directory cards, Pico breadcrumbs,
+and a file table beside directory information and upload/new-folder forms.
+Connection, directory, and share settings keep their existing form fields and
+actions. Small screens stack panels and keep wide tables in scrollable regions.
+Colors follow the browser's light/dark preference; no theme preference is stored.
+HTMX refreshes navigation together with the main view. Public shares use a simpler
+read-only shell without management navigation or owner identity metadata.
+The header aligns with its content frame, including on public share pages.
+Anchor navigation briefly outlines the destination panel. File browsing has
+Upload and New folder shortcuts to the corresponding panels. Repeated navigation
+and anchored HTMX replacements refresh the cue; ordinary page loads and unanchored
+updates do not highlight a default panel. Reduced-motion users get a temporary
+static outline instead of a fade. The workspace fills the frame with equal
+left/right padding, without an additional inner width cap.
+Binary settings and confirmations use PicoCSS switches throughout, including
+Cast shuffle/loop controls. Their labels provide larger click/tap areas, and
+switch sizing is kept separate from text inputs so focus and panel highlights
+do not collapse the controls. Form field names, values, and required confirmation
+behavior are unchanged.
+
 Image and video files have an **Open** action in private folders and public
 shares. Previews use a native HTML dialog with images and video controls, keeping
 the folder in place. Previous/Next moves through media on the current listing
@@ -316,7 +336,7 @@ secret volume as well as the appropriate database backup.
 
 ## Development and checks
 
-Use Go 1.27. From the parent razcloud checkout, the root Compose/Caddy stack
+Use Go 1.27. From the parent Razzie Cloud checkout, the root Compose/Caddy stack
 provides broker discovery, gateway sign-in, and the files route. For disposable
 standalone dependencies, set `TEST_POSTGRES_PASSWORD` and `TEST_S3_PASSWORD`, then
 run `docker compose up -d` in this repository against a local Docker daemon.
@@ -361,7 +381,7 @@ git push origin "$RELEASE_TAG"
 
 The tagged commit must include `.github/workflows/publish-image.yml`. Creating
 a new tag through GitHub's release UI also triggers the workflow. Tags in the
-parent razcloud repository do not trigger service builds.
+parent Razzie Cloud repository do not trigger service builds.
 
 The image tag exactly matches the Git tag, including any `v` prefix; no `latest`
 alias is added. Use Docker-compatible tags: 1–128 ASCII letters, digits,

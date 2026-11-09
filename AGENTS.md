@@ -1,7 +1,7 @@
 # Files development
 
 This is the independent `github.com/razzie-cloud/files` Go 1.27 repository and a
-submodule of razcloud. Keep service changes here and deployment changes in infra.
+submodule of Razzie Cloud. Keep service changes here and deployment changes in infra.
 
 Use rclone's Go S3 and crypt APIs. Never shell out to rclone, implement custom
 encryption, or expose rclone RC. Preserve the guarded egress proxy: validating
@@ -10,6 +10,12 @@ Initialize rclone helpers before requests and isolate every crypt cache alias.
 
 Frontend: embedded HTMX and PicoCSS only; retain vendored licenses. No SPA or
 frontend build pipeline. Keep CSP-compatible settings and escaped templates.
+The main HTMX fragment includes sidebar navigation and the current view; the
+public share shell never includes management links. Layout/theme rules live in
+`internal/web/static/app.css` and follow the browser's light/dark preference.
+Use PicoCSS switches (`type="checkbox" role="switch"`) for every binary toggle,
+including confirmations and Cast options. Exclude switches from text-input sizing
+rules so Pico retains their dimensions and focus/checked styling.
 
 User identity comes only from proxy-supplied X-Auth-Request-User UUIDs. Every
 metadata lookup is owner-scoped. Management traffic must pass through the gateway.

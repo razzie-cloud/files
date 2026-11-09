@@ -12,7 +12,7 @@ no separate login system or local file sync.
 
 ## Try it locally
 
-Use the [razcloud local quickstart](https://github.com/razzie-cloud/.github#try-it-locally)
+Use the [Razzie Cloud local quickstart](https://github.com/razzie-cloud/.github#try-it-locally)
 with Git, GitHub SSH access, and Docker Compose. It starts Files together with
 its database, gateway, and reverse proxy. This repository's `docker-compose.yml`
 starts development dependencies only.
