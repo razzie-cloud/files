@@ -3,6 +3,7 @@ module github.com/razzie-cloud/files
 go 1.27
 
 require (
+	aidanwoods.dev/go-paseto v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pressly/goose/v3 v3.26.0
@@ -16,6 +17,7 @@ require (
 )
 
 require (
+	aidanwoods.dev/go-result v0.3.1 // indirect
 	github.com/IBM/go-sdk-core/v5 v5.23.1 // indirect
 	github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd // indirect
 	github.com/abbot/go-http-auth v0.4.0 // indirect

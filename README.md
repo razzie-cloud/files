@@ -61,3 +61,13 @@ The header logo and Razzie Cloud name link to `LANDING_ORIGIN`
 HTTP(S) origin of your landing page, without a trailing slash. The adjacent
 service name opens this app. Compose and Swarm set the landing origin for their
 local/public domain. Public Files shares retain their read-only navigation.
+
+Set `ACCESS_GATEWAY_URL` (`--access-gateway-url`) to the gateway's exact origin,
+for example `http://access-gateway:8080` on the private container network, to
+require signed proxy identity. Startup fetches `/.well-known/paseto-keys` and
+fails if discovery fails. Expired key sets refresh on use; stale keys are never
+accepted. Caddy must strip incoming `X-Auth-Request-Token` and copy the gateway's
+value alongside UUID/name. The service verifies the PASETO signature, issuer,
+public app `ORIGIN`, expiry, method, URI and matching identity headers.
+An empty setting retains trusted-proxy header mode. See the gateway's
+[signed identity contract](https://github.com/razzie-cloud/access-gateway/blob/master/docs/reference.md#signed-proxy-identity).

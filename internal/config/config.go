@@ -13,9 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/razzie-cloud/files/internal/gatewayidentity"
 )
 
 type Config struct {
+	AccessGatewayURL                                                                        string
 	LandingOrigin                                                                           string
 	Port, Origin, ShareOrigin, PostgresURI, PostgresURIFrom, PasswordFile, ImportSecretsDir string
 	CastShareTTL                                                                            time.Duration
@@ -36,6 +39,7 @@ func Load(args []string, env func(string) string) (Config, error) {
 		}
 		f.StringVar(p, name, value, variable)
 	}
+	str(&c.AccessGatewayURL, "access-gateway-url", "ACCESS_GATEWAY_URL", "")
 	str(&c.Port, "port", "SERVICE_PORT", "8080")
 	str(&c.LandingOrigin, "landing-origin", "LANDING_ORIGIN", "https://razzie.cloud")
 	str(&c.Origin, "origin", "ORIGIN", "")
@@ -91,6 +95,11 @@ func Load(args []string, env func(string) string) (Config, error) {
 	}
 	if c.CastShareTTL <= 0 || c.CastShareTTL > 24*time.Hour {
 		return c, errors.New("CAST_SHARE_TTL must be positive and at most 24h")
+	}
+	if c.AccessGatewayURL != "" {
+		if err := gatewayidentity.ValidateURL(c.AccessGatewayURL); err != nil {
+			return c, err
+		}
 	}
 	landing, landingErr := url.Parse(c.LandingOrigin)
 	if landingErr != nil || landing.Hostname() == "" || (landing.Scheme != "http" && landing.Scheme != "https") || landing.User != nil || landing.Path != "" || landing.RawQuery != "" || landing.ForceQuery || landing.Fragment != "" {

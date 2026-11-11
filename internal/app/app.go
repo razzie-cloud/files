@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/razzie-cloud/files/internal/config"
+	"github.com/razzie-cloud/files/internal/gatewayidentity"
 	"github.com/razzie-cloud/files/internal/health"
 	"github.com/razzie-cloud/files/internal/identity"
 	"github.com/razzie-cloud/files/internal/logging"
@@ -30,17 +31,18 @@ import (
 )
 
 type Server struct {
-	Config        config.Config
-	Repo          store.Repository
-	Secrets       *secrets.Store
-	Storage       storage.Factory
-	Policy        *rclonestorage.Policy
-	templates     *template.Template
-	uploads       chan struct{}
-	health        *health.Monitor
-	shares        shareCache
-	passwordSlots chan struct{}
-	passwordRate  *rate.Limiter
+	identityVerifier *gatewayidentity.Verifier
+	Config           config.Config
+	Repo             store.Repository
+	Secrets          *secrets.Store
+	Storage          storage.Factory
+	Policy           *rclonestorage.Policy
+	templates        *template.Template
+	uploads          chan struct{}
+	health           *health.Monitor
+	shares           shareCache
+	passwordSlots    chan struct{}
+	passwordRate     *rate.Limiter
 }
 type userKey struct{}
 type crumb struct{ Name, URL string }
@@ -76,7 +78,13 @@ func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, f
 	if e != nil {
 		return nil, e
 	}
-	return &Server{Config: cfg, Repo: repo, Secrets: secretStore, Storage: factory, Policy: policy, templates: t, uploads: make(chan struct{}, cfg.MaxUploads),
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	verifier, e := gatewayidentity.New(ctx, cfg.AccessGatewayURL, cfg.Origin)
+	if e != nil {
+		return nil, e
+	}
+	return &Server{identityVerifier: verifier, Config: cfg, Repo: repo, Secrets: secretStore, Storage: factory, Policy: policy, templates: t, uploads: make(chan struct{}, cfg.MaxUploads),
 		passwordSlots: make(chan struct{}, 2), passwordRate: rate.NewLimiter(2, 5),
 		health: health.New(health.Check{Name: "postgres", Ping: func(ctx context.Context) error { return repo.Ping(ctx) }})}, nil
 }
@@ -150,6 +158,10 @@ func (s *Server) Handler() http.Handler {
 		// The management origin cannot serve public capabilities.
 		if strings.HasPrefix(r.URL.Path, "/s/") {
 			http.NotFound(w, r)
+			return
+		}
+		if err := s.identityVerifier.Verify(r, false); err != nil {
+			http.Error(w, "Verified gateway identity required", 401)
 			return
 		}
 		user, e := identity.FromRequest(r)

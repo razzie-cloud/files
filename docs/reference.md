@@ -90,9 +90,10 @@ files.example.com {
     route {
         request_header -X-Auth-Request-User
         request_header -X-Auth-Request-Name
+        request_header -X-Auth-Request-Token
         forward_auth access-gateway:8080 {
             uri /forward_auth
-            copy_headers X-Auth-Request-User X-Auth-Request-Name
+            copy_headers X-Auth-Request-User X-Auth-Request-Name X-Auth-Request-Token
         }
         reverse_proxy files:8080
     }
@@ -116,6 +117,7 @@ shared-files.example.com {
     route {
         request_header -X-Auth-Request-User
         request_header -X-Auth-Request-Name
+        request_header -X-Auth-Request-Token
         @shared path /s/* /static/*
         reverse_proxy @shared files:8080
         respond 404
@@ -467,3 +469,13 @@ capability tokens and are excluded, together with object names, bucket names,
 prefixes, and remote endpoints. Upload and storage-mutation summaries are DEBUG.
 Raw rclone logging remains disabled. The development S3 fixture uses the same
 JSON format and `LOG_LEVEL` setting.
+
+## Signed gateway identity
+
+`ACCESS_GATEWAY_URL` / `--access-gateway-url` enables mandatory PASETO validation
+on management requests. Fetch keys at startup and on expired/unknown-key use;
+never fall back to unsigned headers or stale keys on failure. Use private-network
+HTTP or trusted HTTPS discovery. Copy `X-Auth-Request-Token` with UUID/name after
+stripping incoming identity. Public capabilities retain capability-only access.
+See the gateway [protocol](https://github.com/razzie-cloud/access-gateway/blob/master/docs/reference.md#signed-proxy-identity)
+for claims, rotation and cache deadlines.

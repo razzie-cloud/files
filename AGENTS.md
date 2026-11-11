@@ -51,3 +51,12 @@ that variable they skip. Never point tests at production or use a production
 Docker daemon. Add migrations rather than changing deployed schema migrations.
 
 Do not push images, publish the repository, or deploy without authorization.
+
+When ACCESS_GATEWAY_URL / --access-gateway-url is configured, initialize
+internal/gatewayidentity before serving. Require X-Auth-Request-Token on every
+management route, including static assets, and verify its v4.public signature,
+issuer/audience/time, exact method/URI and UUID/name header equality. Cache public
+keys only until expiry; discovery outages must not extend trust. Keep the verifier
+and tests synchronized with the other S3 app's independent copy. Empty gateway URL
+preserves trusted-proxy mode; public Files capabilities and health probes bypass
+identity. Notes admin APIs also require signed admin=true and the proxy marker.
