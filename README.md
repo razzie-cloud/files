@@ -71,3 +71,16 @@ value alongside UUID/name. The service verifies the PASETO signature, issuer,
 public app `ORIGIN`, expiry, method, URI and matching identity headers.
 An empty setting retains trusted-proxy header mode. See the gateway's
 [signed identity contract](https://github.com/razzie-cloud/access-gateway/blob/master/docs/reference.md#signed-proxy-identity).
+
+## Broker discovery authentication
+
+Set `BROKER_TOKEN_FILE` / `--broker-token-file` to a mounted per-client token
+and add the public `?client=<client_id>` to each `*_URI_FROM` URL. The gateway
+uses one token for its PostgreSQL and Valkey grants. Inline token parameters,
+duplicate authentication parameters and invalid/unreadable token files fail
+startup. Omitting the token-file option preserves tokenless discovery.
+`BROKER_CA_FILE` / `--broker-ca-file` adds the operator CA for verified HTTPS;
+normal system CA trust remains enabled. Discovery refuses redirects, limits
+responses to 4096 bytes, uses five bounded attempts with five-second deadlines,
+and emits diagnostics without URLs, tokens, response bodies or raw HTTP errors.
+Authentication failures never retry without the configured credential.

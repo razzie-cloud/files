@@ -60,3 +60,8 @@ keys only until expiry; discovery outages must not extend trust. Keep the verifi
 and tests synchronized with the other S3 app's independent copy. Empty gateway URL
 preserves trusted-proxy mode; public Files capabilities and health probes bypass
 identity. Notes admin APIs also require signed admin=true and the proxy marker.
+
+Broker discovery uses BROKER_TOKEN_FILE / --broker-token-file and optional
+BROKER_CA_FILE / --broker-ca-file. Discovery URLs carry only public client IDs.
+Keep internal/brokerdiscovery and its tests synchronized across first-party apps.
+Never log discovery URLs or raw HTTP errors; no authentication fallback is allowed.
