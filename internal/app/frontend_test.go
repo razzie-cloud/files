@@ -29,6 +29,7 @@ func TestFrontendPublicAndReadOnlyViews(t *testing.T) {
 		{"public-error", view{Page: "error", Public: true, Message: "Unavailable"}, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			tc.data.LandingOrigin = "http://localhost:9191"
 			tc.data.User = identity.User{Name: "private-owner-metadata"}
 			tc.data.Entries = []storage.Entry{{Name: "<file>.png", Path: "<file>.png"}}
 			var page bytes.Buffer
@@ -36,6 +37,12 @@ func TestFrontendPublicAndReadOnlyViews(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := page.String()
+			if !strings.Contains(html, `href="http://localhost:9191/" class="brand"`) && !strings.Contains(html, `class="brand" href="http://localhost:9191/"`) {
+				t.Fatal("cloud brand does not link to landing")
+			}
+			if tc.management && !strings.Contains(html, `href="/" class="service-name">Files</a>`) {
+				t.Fatal("app name does not link to Files")
+			}
 			if strings.Contains(html, `aria-label="Primary"`) != tc.management {
 				t.Fatal("management navigation visibility is wrong")
 			}
@@ -53,7 +60,7 @@ func TestFrontendPublicAndReadOnlyViews(t *testing.T) {
 					t.Fatal("public shell exposes owner metadata")
 				}
 				for _, u := range pageURLs(t, html, "a", "href") {
-					if u.Path == "/" || strings.HasPrefix(u.Path, "/connections") || strings.HasPrefix(u.Path, "/directories") {
+					if !u.IsAbs() && (u.Path == "/" || strings.HasPrefix(u.Path, "/connections") || strings.HasPrefix(u.Path, "/directories")) {
 						t.Fatalf("public view links to management: %s", u)
 					}
 				}

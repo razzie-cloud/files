@@ -45,6 +45,7 @@ type Server struct {
 type userKey struct{}
 type crumb struct{ Name, URL string }
 type view struct {
+	LandingOrigin                               string
 	Page, Message, Path, Parent, Next, Previous string
 	User                                        identity.User
 	Connections                                 []store.Connection
@@ -186,6 +187,10 @@ func user(r *http.Request) identity.User {
 	return u
 }
 func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
+	v.LandingOrigin = s.Config.LandingOrigin
+	if v.LandingOrigin == "" {
+		v.LandingOrigin = "https://razzie.cloud"
+	}
 	v.User = user(r)
 	v.UploadLimit = s.Config.MaxUploadBytes
 	v.UploadFileLimit = maxUploadFiles

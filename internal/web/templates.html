@@ -4,8 +4,8 @@
 <title>{{if .Public}}Shared files{{else}}Files{{end}} · Razzie Cloud</title><link rel="icon" href="/static/razzie-cloud-logo.png"><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css">
 <script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script>{{if .ShareEnabled}}<script defer src="/static/cast-controller.js"></script><script defer src="/static/cast.js"></script>{{end}}</head>
 <body><a class="skip-link" href="#main">Skip to content</a><header class="topbar{{if .Public}} public-topbar{{end}}">
-{{if .Public}}<span class="brand"><img class="brand-mark" src="/static/razzie-cloud-logo.png" width="46" height="46" alt=""><strong>Razzie Cloud</strong><span class="service-name">Shared files</span></span><span class="badge">Read-only share</span>
-{{else}}<a href="/" class="brand"><img class="brand-mark" src="/static/razzie-cloud-logo.png" width="46" height="46" alt=""><strong>Razzie Cloud</strong><span class="service-name">Files</span></a><div class="topbar-right"><a href="/connections">Storage connections</a><div class="identity">{{template "icon-shield"}}<span>{{if .User.Name}}{{.User.Name}}{{else}}Your storage{{end}}</span></div></div>{{end}}
+{{if .Public}}<div class="brand-group"><a class="brand" href="{{.LandingOrigin}}/"><img class="brand-mark" src="/static/razzie-cloud-logo.png" width="46" height="46" alt=""><strong>Razzie Cloud</strong></a><span class="service-name">Shared files</span></div><span class="badge">Read-only share</span>
+{{else}}<div class="brand-group"><a href="{{.LandingOrigin}}/" class="brand"><img class="brand-mark" src="/static/razzie-cloud-logo.png" width="46" height="46" alt=""><strong>Razzie Cloud</strong></a><a href="/" class="service-name">Files</a></div><div class="topbar-right"><a href="/connections">Storage connections</a><div class="identity">{{template "icon-shield"}}<span>{{if .User.Name}}{{.User.Name}}{{else}}Your storage{{end}}</span></div></div>{{end}}
 </header><main id="main">{{template "content" .}}</main>{{if .ShareEnabled}}{{template "cast-controller" .}}{{end}}</body></html>{{end}}
 
 {{define "content"}}

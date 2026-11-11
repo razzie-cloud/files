@@ -55,3 +55,9 @@ See the [reference guide](docs/reference.md) for complete proxy examples,
 configuration, encryption, sharing, Cast support, upgrades, and development.
 Contributor invariants are in [AGENTS.md](AGENTS.md); the
 [infra repository](https://github.com/razzie-cloud/infra) provides a Swarm deployment.
+
+The header logo and Razzie Cloud name link to `LANDING_ORIGIN`
+(`--landing-origin`, default `https://razzie.cloud`). Set this to the exact
+HTTP(S) origin of your landing page, without a trailing slash. The adjacent
+service name opens this app. Compose and Swarm set the landing origin for their
+local/public domain. Public Files shares retain their read-only navigation.

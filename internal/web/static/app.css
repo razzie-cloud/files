@@ -444,3 +444,7 @@ fieldset[data-crypt] { padding: 1rem; border: 1px solid var(--pico-muted-border-
 label:has(>input[role="switch"]) { display: flex; align-items: center; gap: .65rem; min-height: 44px; padding-block: .35rem; cursor: pointer; }
 label>input[role="switch"] { flex-shrink: 0; margin: 0; }
 input[role="switch"]:checked { --pico-color: var(--pico-primary-inverse); }
+
+/* Shared cloud home and app home are separate navigation targets. */
+.brand-group { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+.brand-group .service-name { text-decoration: none; white-space: nowrap; }

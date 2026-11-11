@@ -13,7 +13,7 @@ func TestLoadValidation(t *testing.T) {
 	if _, e := Load(nil, func(k string) string { return base[k] }); e != nil {
 		t.Fatal(e)
 	}
-	for _, test := range []struct{ key, value string }{{"ORIGIN", "https://files.example.com/path"}, {"POSTGRES_URI_FROM", "http://broker/uri"}, {"MAX_UPLOAD_BYTES", "0"}, {"S3_ALLOW_HTTP", "maybe"}, {"MAX_CONCURRENT_UPLOADS", "999"}} {
+	for _, test := range []struct{ key, value string }{{"LANDING_ORIGIN", "javascript:alert(1)"}, {"LANDING_ORIGIN", "https://home.example/path"}, {"ORIGIN", "https://files.example.com/path"}, {"POSTGRES_URI_FROM", "http://broker/uri"}, {"MAX_UPLOAD_BYTES", "0"}, {"S3_ALLOW_HTTP", "maybe"}, {"MAX_CONCURRENT_UPLOADS", "999"}} {
 		t.Run(test.key, func(t *testing.T) {
 			env := func(k string) string {
 				if k == test.key {
