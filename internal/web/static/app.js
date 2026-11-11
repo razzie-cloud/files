@@ -24,6 +24,18 @@ document.addEventListener("click", event => {
 // top-level navigation to let the gateway establish a fresh app session.
 document.addEventListener("htmx:sendError", () => { location.assign(location.pathname + location.search); });
 
+// Let the rest of a file row activate its name link, keeping actions independent.
+document.addEventListener("click", event => {
+  if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (event.target.closest("a, button, input, select, textarea, label, details, form, [contenteditable]")) return;
+  if (window.getSelection()?.isCollapsed === false) return;
+  const link = event.target.closest(".file-table tbody tr")?.querySelector("[data-entry-open]");
+  if (link) {
+    event.preventDefault();
+    link.click();
+  }
+});
+
 // Native dialogs preserve the folder, trap focus, and support Escape to close.
 let previewLinks = [];
 let previewIndex = 0;
@@ -68,8 +80,9 @@ document.addEventListener("click", event => {
   if (link) {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !dialog.showModal) return;
     event.preventDefault();
-    previewLinks = Array.from(document.querySelectorAll("[data-preview]"));
-    showPreview(dialog, previewLinks.indexOf(link));
+    // A file has both a name link and an Open action; visit it only once.
+    previewLinks = Array.from(new Map(Array.from(document.querySelectorAll("[data-preview]"), item => [item.href, item])).values());
+    showPreview(dialog, previewLinks.findIndex(item => item.href === link.href));
     dialog.showModal();
   } else if (event.target.closest("[data-preview-close]") || event.target === dialog) {
     dialog.close();
