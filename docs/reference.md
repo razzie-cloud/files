@@ -263,7 +263,9 @@ wildcard/private-network exceptions for user-supplied endpoints.
 
 ## Using storage
 
-1. Open Storage connections. Supply an S3 provider, endpoint, signing region,
+1. Open Storage connections. The first connection form appears inline. Once a
+   connection exists, use **Add connection** or a card's **Edit connection** to
+   open the form in a native dialog. Supply an S3 provider, endpoint, signing region,
    credentials, addressing mode, and an explicit Read-only or Writable choice.
 2. Add a directory with its connection, bucket, and optional prefix. It may further
    restrict a writable connection to read-only. Overlapping roots on the same

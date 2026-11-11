@@ -9,7 +9,8 @@ Serve the **Razzie Cloud parent directory** with
 | Directory overview | [index.html](index.html) | Directory cards, shared shell, storage connections |
 | Nested file browser | [browse.html](browse.html) | Pico breadcrumbs, file table, contextual details and uploads |
 | Intermediate folders | [workspace.html](workspace.html), [projects.html](projects.html), [folder.html](folder.html) | Clickable ancestor navigation and empty folder layout |
-| Storage connections | [connections.html](connections.html) | Form beside existing provider cards |
+| Storage connections | [connections.html](connections.html) | Connection cards with Add/Edit dialogs |
+| First connection | [connections-empty.html](connections-empty.html) | Inline setup when no connections exist |
 | Add directory | [directory.html](directory.html) | Grouped setup, encryption disclosure, explanatory column |
 | Sharing | [shares.html](shares.html) | Read-only capability link form |
 | Recipient view | [public.html](public.html) | Simplified public shell |
@@ -44,6 +45,37 @@ adds layout and Pico variable overrides. `fragments/` contains HTMX fixtures.
 Production templates now implement this layout and automatically follow the
 browser's light/dark preference, retaining advanced settings and live file actions.
 These mockup pages remain separate fixtures with simulated interactions.
+
+## Connection dialog concept
+
+Existing connections show cards and **Add connection**, with no inline connection
+form. Add and Edit fetch static form fragments through HTMX into an HTML5
+`dialog`, opened with `showModal()`. Edit fills the selected connection's public
+settings; credential inputs remain blank. Empty setup keeps the first form inline.
+Cancel, Close and Escape discard the draft and return focus to the opener.
+Save closes the dialog and shows explicit fixture feedback with the sample cards.
+The preview does not persist entered values. **Preview a save error** keeps the
+draft in place. All connection fixture forms use `hx-params="none"` and unnamed
+inputs so credentials never enter requests.
+
+Both themes include existing and empty states. Screenshots:
+[list](connections-desktop.png), [edit dialog](connections-edit-desktop.png),
+[mobile dialog](connections-edit-mobile.png), [empty](connections-empty-desktop.png),
+and their counterparts under `dark/`. The small external
+`storage-connections.js` handles native dialog lifecycle; HTMX handles fixture
+requests. The reviewed flow is now implemented in the production templates with
+real save routes, revision checks and draft-preserving error feedback. These
+mockup fixtures still simulate all mutations.
+
+The connection concept passed Chromium checks in both themes at 320, 390, 768
+and 1440 pixels for existing/empty states (16 layout cases). Checks exercised
+Add/Edit, native modal focus, Escape/Close/Cancel, settings prefill, blank
+credentials, validation, error draft retention, simulated saves, bucket tests,
+removal feedback and theme round trips. Network inspection confirmed no entered
+values were transmitted; no browser errors or failed responses were observed.
+Local references, unique IDs, synchronized modal assets and Git whitespace were
+checked. Screenshots were inspected visually. No Go checks or live backend
+acceptance were run for these mockup-only changes.
 
 See [the coordinated design notes](../../../docs/frontend-mockups.md) in the
 parent checkout for scope and verification details.

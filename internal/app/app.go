@@ -53,6 +53,7 @@ type view struct {
 	Connections                                 []store.Connection
 	Directories                                 []store.Directory
 	Connection                                  *store.Connection
+	ConnectionForm, ConnectionDialog            bool
 	Directory                                   *store.Directory
 	Entries                                     []storage.Entry
 	Crumbs                                      []crumb
@@ -115,6 +116,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /static/", logging.Route("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static()))))
 	handle("GET /{$}", s.home)
 	handle("GET /connections", s.connections)
+	handle("GET /connections/new", s.connections)
 	handle("GET /connections/{id}/edit", s.connections)
 	handle("POST /connections", s.saveConnection)
 	handle("POST /connections/{id}/update", s.saveConnection)
@@ -212,6 +214,10 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 	name := "page"
 	if r.Header.Get("HX-Request") == "true" {
 		name = "content"
+		if v.Page == "connections" && r.Header.Get("HX-Target") == "connection-dialog-content" {
+			name = "connection-dialog"
+			v.ConnectionDialog = true
+		}
 	}
 	if e := s.templates.ExecuteTemplate(w, name, v); e != nil {
 		logging.Fields(r.Context(), "template", name)
@@ -257,6 +263,18 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 		logging.FailKind(r.Context(), slog.LevelWarn, "storage", "crypto")
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Header.Get("HX-Request") == "true" && (r.Header.Get("HX-Target") == "connection-feedback" || r.Header.Get("HX-Target") == "connection-dialog-content") {
+		target := "#connection-feedback"
+		if r.Header.Get("HX-Target") == "connection-dialog-content" {
+			target = "#connection-list-feedback"
+		}
+		w.Header().Set("HX-Retarget", target)
+		w.WriteHeader(status)
+		if err := s.templates.ExecuteTemplate(w, "connection-error", view{Message: message}); err != nil {
+			logging.Fail(r.Context(), slog.LevelError, "render_template", err)
+		}
+		return
+	}
 	w.WriteHeader(status)
 	v.Page, v.Message = "error", message
 	s.render(w, r, v)
@@ -301,7 +319,7 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
-	v := view{Page: "connections", Connections: all, Connection: &store.Connection{Provider: "Other", PathStyle: true, AccessMode: "read_only"}}
+	v := view{Page: "connections", Connections: all, ConnectionForm: r.URL.Path == "/connections/new", Connection: &store.Connection{Provider: "Other", PathStyle: true, AccessMode: "read_only"}}
 	if id := r.PathValue("id"); id != "" {
 		c, e := s.Repo.Connection(r.Context(), user(r).ID, id)
 		if e != nil {
@@ -309,6 +327,7 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		v.Connection = &c
+		v.ConnectionForm = true
 	}
 	s.render(w, r, v)
 }

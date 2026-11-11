@@ -22,7 +22,10 @@ document.addEventListener("click", event => {
 });
 // Cross-origin auth redirects cannot be followed by an HTMX XHR. Repeat as a
 // top-level navigation to let the gateway establish a fresh app session.
-document.addEventListener("htmx:sendError", () => { location.assign(location.pathname + location.search); });
+document.addEventListener("htmx:sendError", event => {
+  if (event.detail.elt.closest("[data-connection-form]")) return;
+  location.assign(location.pathname + location.search);
+});
 
 // Let the rest of a file row activate its name link, keeping actions independent.
 document.addEventListener("click", event => {

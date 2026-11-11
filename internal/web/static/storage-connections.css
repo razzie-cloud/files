@@ -1,0 +1,62 @@
+/* Shared storage settings and native connection dialogs. */
+.storage-intro { margin: -1rem 0 1.8rem; font-size: .85rem; color: var(--pico-muted-color); }
+.connection-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.4rem; }
+.connection-grid>* { min-width: 0; }
+.connection-card .connection-line { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
+.connection-line h2 { margin: 0 0 .25rem; }
+.connection-line p { margin: 0; font-size: .8rem; }
+.connection-card .info-list { margin: 0; }
+.connection-card .info-list div { align-items: baseline; }
+.connection-card .info-list dd { overflow-wrap: anywhere; min-width: 0; font-size: .8rem; }
+.connection-card .info-list dt { flex-shrink: 0; }
+.connection-actions { margin-top: 1.3rem; }
+.connection-card details { margin-top: 1.2rem; font-size: .85rem; }
+.connection-card details:last-child { margin-bottom: 0; }
+.connection-card details p { font-size: .8rem; margin-top: .8rem; }
+.connection-card details form { margin-bottom: 0; }
+.connection-form small { display: block; margin: -.5rem 0 1rem; font-weight: 400; }
+.connection-form .two-column-form { gap: 1rem; }
+.connection-form label:has([role="switch"]) { margin-bottom: 1rem; }
+.connection-form .field-section { border: 0; border-top: 1px solid var(--pico-muted-border-color); margin: .6rem 0 1rem; padding: 1.2rem 0 0; }
+.connection-form h3 { margin-bottom: .7rem; }
+.connection-form .credential-hint { margin: 0 0 1rem; font-size: .8rem; color: var(--pico-muted-color); }
+.form-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; }
+.form-actions button { width: auto; margin: 0; }
+.connection-feedback:empty { display: none; }
+.connection-feedback { margin-bottom: 1.4rem; }
+.connection-feedback .notice { margin: 0; }
+.save-error { color: var(--pico-color); border: 1px solid var(--pico-muted-border-color); border-radius: .5rem; padding: .9rem; font-size: .85rem; margin-bottom: 1rem; }
+.empty-connections { display: grid; grid-template-columns: minmax(0,680px) minmax(0,1fr); align-items: start; gap: 2rem; }
+.empty-connections>* { min-width: 0; }
+.empty-help { padding: 1rem 0; }
+.empty-help h2 { margin-bottom: 1rem; }
+.empty-help p { color: var(--pico-muted-color); font-size: .87rem; }
+.notebooks-preview { margin-top: 2.5rem; }
+.notebooks-preview>h2 { margin-bottom: 1.2rem; }
+.notebook-card p { font-size: .85rem; }
+.notebook-card details { margin-bottom: 0; }
+.notebook-card details form { margin-top: 1rem; }
+body:has(#connection-dialog[open]) { overflow: hidden; }
+#connection-dialog { background: transparent; backdrop-filter: none; padding: 1rem; }
+#connection-dialog::backdrop { background: #09111bb3; backdrop-filter: blur(3px); }
+#connection-dialog>article { display: flex; flex-direction: column; width: 100%; max-width: 680px; max-height: calc(100dvh - 2rem); margin: 0; padding: 0; overflow: hidden; box-shadow: 0 16px 64px #0005; }
+#connection-dialog article>header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-shrink: 0; margin: 0; padding: 1.25rem 1.6rem; border-bottom: 1px solid var(--pico-muted-border-color); }
+#connection-dialog article>header h2 { font-size: 1.25rem; margin-bottom: .25rem; }
+#connection-dialog article>header p { font-size: .8rem; color: var(--pico-muted-color); margin: 0; }
+#connection-dialog .dialog-close { padding: .25rem .6rem; line-height: 1.5; font-size: 1.2rem; }
+#connection-dialog .connection-form { display: flex; flex-direction: column; margin: 0; min-height: 0; overflow: hidden; }
+#connection-dialog .form-fields { overflow-y: auto; overscroll-behavior: contain; padding: 1.4rem 1.6rem .25rem; }
+#connection-dialog .form-actions { padding: 1rem 1.6rem; border-top: 1px solid var(--pico-muted-border-color); flex-shrink: 0; background: var(--pico-card-sectioning-background-color); }
+#connection-dialog input:disabled,#connection-dialog select:disabled { opacity: .75; }
+@media(max-width:1020px) { .connection-grid,.empty-connections { grid-template-columns: 1fr; } }
+@media(max-width:760px) { .connection-card { padding: 1.2rem; } #connection-dialog { padding: .5rem; } #connection-dialog>article { max-height: calc(100dvh - 1rem); } #connection-dialog article>header { padding: 1rem; } #connection-dialog .form-fields { padding: 1rem 1rem .25rem; } #connection-dialog .form-actions { padding: 1rem; } }
+
+.connection-form .two-column-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.connection-form fieldset { margin: 0; padding: 0; border: 0; }
+.empty-connections { margin-top: 1.4rem; }
+.storage-connections .section-heading>div { min-width: 0; }
+.storage-section .attach-notebook { margin-top: 0; }
+@media(max-width:760px) { .connection-form .two-column-form { grid-template-columns: 1fr; } .storage-connections .section-heading { align-items: start; flex-direction: column; } }
+
+/* Use the local Pico chevron under the services' strict image CSP. */
+:root { --pico-icon-chevron: url("/static/chevron.svg"); }
