@@ -158,6 +158,8 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			file, _ := writer.CreateFormFile("file", "hello + %.txt")
 			content := bytes.Repeat([]byte("private upload data\n"), 5000)
 			file.Write(content)
+			audio, _ := writer.CreateFormFile("file", "song.mp3")
+			audio.Write(content)
 			writer.Close()
 			upload := func() *httptest.ResponseRecorder {
 				req := httptest.NewRequest("POST", base+"/upload?revision="+strconv.FormatInt(d.Revision, 10), bytes.NewReader(body.Bytes()))
@@ -182,7 +184,7 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			// encoding is covered along with storage reads and decryption.
 			downloadURL := ""
 			for _, u := range pageURLs(t, listing.Body.String(), "a", "href") {
-				if u.Path == base+"/download" {
+				if u.Path == base+"/download" && u.Query().Get("path") == "hello + %.txt" && u.Query().Get("inline") == "" {
 					downloadURL = u.String()
 				}
 			}
@@ -193,6 +195,13 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			if rec.Code != 200 || !bytes.Equal(rec.Body.Bytes(), content) {
 				t.Fatalf("download %d length %d", rec.Code, rec.Body.Len())
 			}
+			previewURL := downloadURL + "&inline=1"
+			if rec := request("GET", previewURL, nil, testOwner); rec.Code != 200 || !strings.Contains(rec.Body.String(), string(content)) || !strings.Contains(rec.Body.String(), `class="plain-text"`) {
+				t.Fatalf("text preview %d: length %d", rec.Code, rec.Body.Len())
+			}
+			if rec := request("GET", previewURL, nil, uuid.NewString()); rec.Code != 404 {
+				t.Fatal("cross-user preview accepted")
+			}
 			rangeRequest := httptest.NewRequest("GET", downloadURL, nil)
 			rangeRequest.Header.Set("X-Auth-Request-User", testOwner)
 			rangeRequest.Header.Set("Range", "bytes=65000-66000")
@@ -200,6 +209,21 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			handler.ServeHTTP(ranged, rangeRequest)
 			if ranged.Code != 206 || ranged.Header().Get("Content-Range") != "bytes 65000-66000/"+strconv.Itoa(len(content)) || !bytes.Equal(ranged.Body.Bytes(), content[65000:66001]) {
 				t.Fatalf("HTTP range %d: %s", ranged.Code, ranged.Header().Get("Content-Range"))
+			}
+			audioURL := base + "/download?path=song.mp3&inline=1"
+			audioRequest := httptest.NewRequest("GET", audioURL, nil)
+			audioRequest.Header.Set("X-Auth-Request-User", testOwner)
+			audioRequest.Header.Set("Range", "bytes=65000-66000")
+			audioResponse := httptest.NewRecorder()
+			handler.ServeHTTP(audioResponse, audioRequest)
+			if audioResponse.Code != 206 || audioResponse.Header().Get("Content-Type") != "audio/mpeg" || audioResponse.Header().Get("Content-Range") != "bytes 65000-66000/"+strconv.Itoa(len(content)) || !bytes.Equal(audioResponse.Body.Bytes(), content[65000:66001]) {
+				t.Fatalf("audio range %d: %v", audioResponse.Code, audioResponse.Header())
+			}
+			if rec := request("GET", audioURL, nil, uuid.NewString()); rec.Code != 404 {
+				t.Fatal("cross-user audio preview accepted")
+			}
+			if rec := request("POST", base+"/delete-file", url.Values{"path": {"song.mp3"}, "revision": {"1"}, "confirm": {"on"}}, testOwner); rec.Code != 303 {
+				t.Fatalf("delete audio %d", rec.Code)
 			}
 			var large bytes.Buffer
 			largeWriter := multipart.NewWriter(&large)

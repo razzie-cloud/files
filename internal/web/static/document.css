@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; }
+body { margin: 0; }
+main { padding: 1.25rem; max-width: 64rem; margin-inline: auto; }
+article.markdown { padding: 0; margin: 0; border: 0; box-shadow: none; background: transparent; overflow-wrap: anywhere; }
+.plain-text { margin: 0; padding: 0; border: 0; background: transparent; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.plain-text code { padding: 0; color: var(--pico-color); background: transparent; }
+.markdown pre { overflow-x: auto; }
+.markdown table { display: block; overflow-x: auto; }
+.markdown input[type="checkbox"] { pointer-events: none; }

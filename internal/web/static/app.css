@@ -325,6 +325,8 @@ nav[aria-label="breadcrumb"] li:last-child a { color: var(--pico-color); }
 #media-preview .media-close{float:right;margin:0 0 .5rem 1rem;padding:.25rem .75rem;font-size:.875rem}
 .media-stage{display:flex;align-items:center;justify-content:center;min-height:8rem}
 .media-stage img,.media-stage video{display:block;max-width:100%;max-height:65vh;object-fit:contain}
+.media-stage audio{display:block;width:100%;max-width:40rem}
+.media-stage iframe{display:block;width:100%;height:65vh;border:1px solid var(--pico-muted-border-color);border-radius:var(--pico-border-radius);background:var(--pico-background-color)}
 #media-preview footer{padding:1rem var(--pico-block-spacing-horizontal)}
 .media-navigation{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
 .media-navigation button{font-size:.875rem;padding:.5rem .75rem}

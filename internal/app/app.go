@@ -135,11 +135,11 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 		// SDK execution is opt-in through capable views; these path-scoped
 		// exceptions also allow an initial document to navigate there via HTMX.
 		if s.Config.ShareOrigin != "" {
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://www.gstatic.com/cv/js/sender/ https://www.gstatic.com/cast/sdk/libs/sender/ https://www.gstatic.com/eureka/clank/; connect-src 'self' "+s.Config.ShareOrigin+"; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://www.gstatic.com/cv/js/sender/ https://www.gstatic.com/cast/sdk/libs/sender/ https://www.gstatic.com/eureka/clank/; connect-src 'self' "+s.Config.ShareOrigin+"; style-src 'self'; img-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 		}
 		// Select public routes by the actual Host, never by forwarded identity.
 		if s.Config.ShareOrigin != "" && sameHost(r.Host, s.Config.ShareOrigin) {
@@ -924,12 +924,21 @@ func (s *Server) serveDownload(w http.ResponseWriter, r *http.Request, fs storag
 			http.Error(w, "This file type cannot be previewed.", http.StatusUnsupportedMediaType)
 			return
 		}
+		if contentType == "text/plain" || contentType == "text/markdown" {
+			s.serveDocument(w, r, fs, key, contentType == "text/markdown")
+			return
+		}
 		disposition = "inline"
 		// A directly opened media document needs to load its own URL. SVG is
 		// an active document format: deny scripts and all subresources there.
 		policy := "default-src 'none'; media-src 'self'; img-src 'self'; sandbox allow-same-origin; frame-ancestors 'none'"
 		if contentType == "image/svg+xml" {
 			policy = "default-src 'none'; sandbox; frame-ancestors 'none'"
+		}
+		if contentType == "application/pdf" {
+			// Native PDF viewers cannot run in a sandboxed plugin frame. The
+			// browser isolates its viewer; permit embedding only by this origin.
+			policy = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
 		}
 		w.Header().Set("Content-Security-Policy", policy)
 	}

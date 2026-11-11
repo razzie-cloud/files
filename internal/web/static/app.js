@@ -29,13 +29,18 @@ let previewLinks = [];
 let previewIndex = 0;
 function clearPreview(dialog) {
   const image = dialog.querySelector("[data-preview-image]");
-  const video = dialog.querySelector("[data-preview-video]");
   image.hidden = true;
   image.removeAttribute("src");
-  video.pause();
-  video.hidden = true;
-  video.removeAttribute("src");
-  video.load(); // Release the previous stream, including when the dialog closes.
+  dialog.querySelectorAll("[data-preview-video], [data-preview-audio]").forEach(media => {
+    media.pause();
+    media.hidden = true;
+    media.removeAttribute("src");
+    media.load(); // Release the previous stream, including when the dialog closes.
+  });
+  dialog.querySelectorAll("[data-preview-document], [data-preview-pdf]").forEach(frame => {
+    frame.hidden = true;
+    frame.removeAttribute("src");
+  });
 }
 function showPreview(dialog, index) {
   clearPreview(dialog);
@@ -46,11 +51,13 @@ function showPreview(dialog, index) {
   const download = new URL(link.href);
   download.searchParams.delete("inline");
   dialog.querySelector("[data-preview-download]").href = download.href;
+  dialog.querySelector("[data-preview-tab]").href = link.href;
   dialog.querySelector("[data-preview-previous]").disabled = index === 0;
   dialog.querySelector("[data-preview-next]").disabled = index === previewLinks.length - 1;
   dialog.querySelector("[data-preview-position]").textContent = `${index + 1} of ${previewLinks.length}`;
-  const media = dialog.querySelector(link.dataset.preview === "video" ? "[data-preview-video]" : "[data-preview-image]");
+  const media = dialog.querySelector(`[data-preview-${link.dataset.preview}]`);
   if (media.tagName === "IMG") media.alt = link.dataset.name;
+  if (media.tagName === "IFRAME") media.title = link.dataset.name;
   media.hidden = false;
   media.src = link.href;
 }
@@ -79,7 +86,7 @@ document.addEventListener("close", event => {
   }
 }, true);
 document.addEventListener("error", event => {
-  if (event.target.matches("[data-preview-image], [data-preview-video]") && !event.target.hidden && event.target.hasAttribute("src")) {
+  if (event.target.matches("[data-preview-image], [data-preview-video], [data-preview-audio]") && !event.target.hidden && event.target.hasAttribute("src")) {
     event.target.closest("dialog").querySelector("[data-preview-error]").hidden = false;
   }
 }, true);

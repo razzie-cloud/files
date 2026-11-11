@@ -8,6 +8,7 @@ require (
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/rclone/gofakes3 v0.0.10
 	github.com/rclone/rclone v1.75.2
+	github.com/yuin/goldmark v1.7.16
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.23.0

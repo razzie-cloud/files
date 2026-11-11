@@ -17,6 +17,15 @@ Use PicoCSS switches (`type="checkbox" role="switch"`) for every binary toggle,
 including confirmations and Cast options. Exclude switches from text-input sizing
 rules so Pico retains their dimensions and focus/checked styling.
 
+File previews reuse the authorized download route for personal files and public
+shares. Keep UTF-8 text/Markdown reads bounded to 2 MiB and escape plain text.
+Goldmark must retain safe rendering defaults; raw HTML, document images, and
+relative links must not run code, fetch resources, or expand a share's scope.
+Document frames use script-free CSP sandboxing. Native PDF viewing allows only
+same-origin framing and retains byte ranges; browser format support varies.
+Audio/video playback must stop and release its source when closing, navigating
+between previews, or replacing the listing through HTMX.
+
 User identity comes only from proxy-supplied X-Auth-Request-User UUIDs. Every
 metadata lookup is owner-scoped. Management traffic must pass through the gateway.
 Public shares use a separate SHARE_ORIGIN hostname and capability-only router;

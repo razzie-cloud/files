@@ -116,13 +116,17 @@
 {{end}}
 {{end}}
 
+{{define "document-preview"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="referrer" content="no-referrer"><title>{{.Name}}</title><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/document.css"></head>
+<body><main>{{if .Message}}<p role="alert">{{.Message}}</p>{{else if .HTML}}<article class="markdown">{{.HTML}}</article>{{else}}<pre class="plain-text"><code>{{.Text}}</code></pre>{{end}}</main></body></html>{{end}}
+
 {{define "media-dialog"}}
 <dialog id="media-preview" aria-labelledby="media-title">
 <article>
 <header><button type="button" class="secondary media-close" aria-label="Close preview" data-preview-close autofocus>Close</button><h2 id="media-title"></h2></header>
-<div class="media-stage"><img data-preview-image alt="" hidden><video data-preview-video controls playsinline preload="metadata" hidden>Your browser cannot play this video.</video></div>
+<div class="media-stage"><img data-preview-image alt="" hidden><video data-preview-video controls playsinline preload="metadata" hidden>Your browser cannot play this video.</video><audio data-preview-audio aria-label="Audio playback" controls preload="metadata" hidden>Your browser cannot play this audio.</audio><iframe data-preview-document title="Document preview" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" hidden></iframe><iframe data-preview-pdf title="PDF preview" referrerpolicy="no-referrer" hidden></iframe></div>
 <p data-preview-error role="alert" hidden>Unable to display this file. It may be unavailable or use a format your browser does not support. Try downloading it.</p>
-<footer><div class="media-navigation"><button type="button" class="secondary" data-preview-previous>← Previous</button><span data-preview-position aria-live="polite"></span><button type="button" class="secondary" data-preview-next>Next →</button></div><a role="button" class="secondary outline" data-preview-download>Download</a></footer>
+<footer><div class="media-navigation"><button type="button" class="secondary" data-preview-previous>← Previous</button><span data-preview-position aria-live="polite"></span><button type="button" class="secondary" data-preview-next>Next →</button></div><a role="button" class="secondary outline" data-preview-download>Download</a> <a class="secondary" data-preview-tab target="_blank" rel="noopener noreferrer">Open in new tab</a></footer>
 </article>
 </dialog>
 {{end}}

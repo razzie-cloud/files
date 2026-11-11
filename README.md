@@ -6,6 +6,9 @@ preview files. Directories can be read-only or writable, with optional rclone
 crypt encryption. Share files and folders through read-only links with optional
 passwords and expiration.
 
+Open text, formatted Markdown, PDFs, images, audio, and video directly in the
+file preview dialog. Media format support depends on your browser.
+
 File contents stay in S3. PostgreSQL stores configuration, S3 credentials, and
 crypt passwords. Files uses access-gateway for sign-in and user identity; it has
 no separate login system or local file sync.

@@ -36,13 +36,41 @@ switch sizing is kept separate from text inputs so focus and panel highlights
 do not collapse the controls. Form field names, values, and required confirmation
 behavior are unchanged.
 
-Image and video files have an **Open** action in private folders and public
-shares. Previews use a native HTML dialog with images and video controls, keeping
-the folder in place. Previous/Next moves through media on the current listing
-page; Escape, the close button, or the backdrop closes the dialog. Video seeking
-uses streamed byte ranges, including for rclone-encrypted files. Supported image
-formats and video codecs depend on the browser; Download remains available when
-a file cannot be displayed.
+Text, Markdown, PDF, image, audio, and video files have an **Open** action in private
+folders and public shares. Previews use a native HTML dialog, keeping the folder
+in place. Previous/Next moves through previewable files on the current listing
+page; Escape, the close button, or the backdrop closes the dialog. Download and
+Open in new tab remain available, including when the browser cannot display a file.
+
+Text previews support UTF-8 (with an optional BOM) up to 2 MiB. Plain text,
+logs, CSV/TSV, JSON, YAML, TOML, configuration files, common source files, and
+README/LICENSE-style files display as escaped text. HTML, XML, and scripts also
+display as text. Binary data, unsupported encodings, and larger text files show
+a download suggestion. Markdown (`.md`, `.markdown`, `.mdown`, `.mkd`) renders
+headings, lists, emphasis, fenced code, tables, task lists, and strikethrough.
+Raw HTML is omitted. Embedded images and relative links display their text only;
+they cannot request other files or expand a public capability. External links
+open separately without a referrer or opener. Document frames deny scripts,
+forms, embedded resources, and parent navigation using CSP and sandboxing.
+
+Audio previews use native playback, volume, and seeking controls for MP3,
+M4A/M4B, AAC, Ogg/Opus, WAV, FLAC, WebM audio (`.weba`), and AIFF. Playback
+starts when you press Play and stops when closing the dialog, moving to another
+file, or replacing the listing through HTMX. Unsupported or malformed audio
+shows a download suggestion; actual codec support depends on the browser.
+
+PDFs use the browser's native viewer. PDF navigation and audio/video seeking retain
+streamed byte ranges, including for rclone-encrypted files. Images include JPEG,
+PNG/APNG, GIF, WebP, AVIF, SVG, BMP, ICO, TIFF, HEIC, and HEIF; actual format and
+codec support depends on the browser. SVG previews deny scripts and subresources.
+PDF responses allow framing only by the same origin; the application continues
+to deny framing of its management and public browsing pages. No conversion
+service or external document viewer receives file contents.
+
+Audio browser regression checks: `python3 tests/audio-browser.py` with Playwright
+and Chromium installed. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects
+an existing Chromium executable. The checks use disposable HTTP fixtures and
+cover playback, seeking, errors, cleanup, and HTMX on desktop/mobile layouts.
 
 ## Authentication
 
