@@ -121,3 +121,22 @@ func TestCastShareTTL(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadBrokerTokenAndTrustFlags(t *testing.T) {
+	env := func(key string) string {
+		if key == "POSTGRES_URI_FROM" {
+			return "https://broker/uri?client=app"
+		}
+		if key == "ORIGIN" {
+			return "https://app.example"
+		}
+		return ""
+	}
+	c, e := Load([]string{"--broker-token-file", "/missing-token", "--broker-ca-file", "/missing-ca"}, env)
+	if e != nil || c.BrokerTokenFile != "/missing-token" || c.BrokerCAFile != "/missing-ca" {
+		t.Fatal("broker flags")
+	}
+	if _, e := c.DatabaseURI(context.Background()); e == nil {
+		t.Fatal("unreadable token must fail startup")
+	}
+}
