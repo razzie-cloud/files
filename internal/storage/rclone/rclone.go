@@ -60,6 +60,23 @@ func defaults(backend string, overrides configmap.Simple) (configmap.Simple, err
 	return m, nil
 }
 func (f *Factory) Open(ctx context.Context, c store.Connection, d store.Directory, credentials, keys secrets.Value) (storage.FS, error) {
+	return f.open(ctx, c, d, credentials, keys, true)
+}
+
+// ProbeListing keeps the normal endpoint, credentials, bucket and user-prefix
+// guards, but does not HEAD a directory marker after an empty S3 listing.
+func (f *Factory) ProbeListing(ctx context.Context, c store.Connection, d store.Directory, credentials secrets.Value) error {
+	d.EncryptionMode = "none"
+	handle, err := f.open(ctx, c, d, credentials, secrets.Value{}, false)
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+	_, err = handle.List(ctx, "")
+	return err
+}
+
+func (f *Factory) open(ctx context.Context, c store.Connection, d store.Directory, credentials, keys secrets.Value, directoryMarkers bool) (storage.FS, error) {
 	var bucketErr error
 	d.Bucket, bucketErr = c.BucketFor(d.Bucket)
 	if bucketErr != nil {
@@ -92,7 +109,7 @@ func (f *Factory) Open(ctx context.Context, c store.Connection, d store.Director
 	if provider == "Backblaze" {
 		provider = "Other"
 	}
-	m, e := defaults("s3", configmap.Simple{"provider": provider, "endpoint": c.Endpoint, "region": c.Region, "access_key_id": credentials.AccessKey, "secret_access_key": credentials.SecretKey, "session_token": credentials.SessionToken, "env_auth": "false", "force_path_style": strconv.FormatBool(c.PathStyle), "no_check_bucket": "true", "directory_markers": "true", "chunk_size": "8Mi", "upload_concurrency": "2", "leave_parts_on_error": "false"})
+	m, e := defaults("s3", configmap.Simple{"provider": provider, "endpoint": c.Endpoint, "region": c.Region, "access_key_id": credentials.AccessKey, "secret_access_key": credentials.SecretKey, "session_token": credentials.SessionToken, "env_auth": "false", "force_path_style": strconv.FormatBool(c.PathStyle), "no_check_bucket": "true", "directory_markers": strconv.FormatBool(directoryMarkers), "chunk_size": "8Mi", "upload_concurrency": "2", "leave_parts_on_error": "false"})
 	if e != nil {
 		return nil, e
 	}

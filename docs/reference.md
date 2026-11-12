@@ -275,6 +275,12 @@ wildcard/private-network exceptions for user-supplied endpoints.
    folder creation, and confirmed delete/replace actions. Read-only directories
    omit those controls and reject forged mutation requests server-side.
 
+**Test bucket access** checks read-only listing permission at the chosen prefix,
+including any automatic user-ID prefix. An empty or not-yet-created prefix is a
+successful check when S3 permits listing it; no directory marker or upload is
+required. Missing buckets and denied listing access still fail. The check never
+creates objects or verifies upload/delete permissions.
+
 For Backblaze, choose Backblaze B2, use
 `https://s3.<your-region>.backblazeb2.com`, and enter that same signing region.
 The application key ID is the access key, and the application key is the secret.

@@ -82,3 +82,9 @@ SQL triggers reject mapping overrides and connection restrictions incompatible
 with any user's existing mappings. Clearing a restriction retains saved mapping
 buckets. New connection forms and SQL defaults use path_style=false; retain
 existing saved choices and explicitly enable it for the local S3 demo.
+
+Connection listing probes must accept a successful empty S3 listing without
+requiring a directory-marker HEAD. Keep normal directory-marker behavior for
+filesystem operations. Probe the same fixed bucket/user-prefixed location through
+the guarded rclone client, never the bucket root as a fallback. Missing buckets
+and denied listing access remain errors; probing must never create objects.

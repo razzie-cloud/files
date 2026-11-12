@@ -750,13 +750,17 @@ func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
-	fs, e := s.Storage.Open(r.Context(), c, d, credentials, secrets.Value{})
-	if e != nil {
-		s.operationError(w, r, e)
-		return
+	if probe, ok := s.Storage.(storage.ListingProber); ok {
+		e = probe.ProbeListing(r.Context(), c, d, credentials)
+	} else {
+		// Storage test doubles may only implement the basic filesystem factory.
+		var fs storage.FS
+		fs, e = s.Storage.Open(r.Context(), c, d, credentials, secrets.Value{})
+		if e == nil {
+			defer fs.Close()
+			_, e = fs.List(r.Context(), "")
+		}
 	}
-	defer fs.Close()
-	_, e = fs.List(r.Context(), "")
 	if e != nil {
 		s.operationError(w, r, e)
 		return

@@ -44,6 +44,12 @@ type Factory interface {
 	Open(context.Context, store.Connection, store.Directory, secrets.Value, secrets.Value) (FS, error)
 }
 
+// ListingProber checks access to an S3 prefix without requiring a directory
+// marker. A successful empty listing proves access even before the first upload.
+type ListingProber interface {
+	ProbeListing(context.Context, store.Connection, store.Directory, secrets.Value) error
+}
+
 func Path(value string, allowRoot bool) (string, error) {
 	if value == "" && allowRoot {
 		return "", nil
