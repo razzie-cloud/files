@@ -56,3 +56,31 @@
     feedback.scrollIntoView({ block: "nearest" });
   });
 })();
+
+// Sharing fields and physical path previews work for inline and HTMX forms.
+(() => {
+  function refresh() {
+    document.querySelectorAll('[data-connection-form]').forEach(form => {
+      const shared = form.querySelector('[name=shared]');
+      const options = form.querySelector('[data-shared-options]');
+      if (!options || !shared) return;
+      options.hidden = !shared.checked;
+      const prefix = options.querySelector('[type=checkbox]');
+      if (prefix && prefix.dataset.prefixLocked !== 'true') prefix.disabled = !shared.checked;
+    });
+    document.querySelectorAll('[data-effective-path]').forEach(output => {
+      const form = output.closest('form');
+      const option = form.querySelector('[name=connection_id]')?.selectedOptions[0];
+      if (!option?.value) { output.textContent = ''; return; }
+      const bucket = form.querySelector('[name=bucket]').value.trim() || 'bucket';
+      const prefix = form.querySelector('[name=prefix]').value.trim().replace(/^\/+|\/+$/g, '');
+      const userPrefix = option.dataset.userIdPrefix === 'true' ? output.dataset.owner + '/' : '';
+      const suffix = option.dataset.shared === 'true' && !userPrefix ? ' Other users mapping this location access the same objects.' : '';
+      output.textContent = 'Storage path: s3://' + bucket + '/' + userPrefix + (prefix ? prefix + '/' : '') + suffix;
+    });
+  }
+  document.addEventListener('DOMContentLoaded', refresh);
+  document.addEventListener('htmx:afterSwap', refresh);
+  document.addEventListener('change', refresh);
+  document.addEventListener('input', refresh);
+})();

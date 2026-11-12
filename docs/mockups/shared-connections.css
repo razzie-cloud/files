@@ -1,0 +1,22 @@
+/* Shared connection concepts reuse the service's connection cards and dialog. */
+.shared-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.path-example { border: 1px solid var(--pico-muted-border-color); border-radius: .5rem; padding: .85rem; margin: 1rem 0; }
+.path-example small { display: block; margin: 0 0 .35rem; font-size: .75rem; }
+.path-example code { display: block; white-space: normal; overflow-wrap: anywhere; font-size: .76rem; line-height: 1.6; background: transparent; padding: 0; }
+.connection-description,.managed-note { font-size: .8rem; color: var(--pico-muted-color); }
+.connection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.connection-actions button,.connection-actions p { margin: 0; }
+.personal-connections { margin-top: 2rem; }
+.personal-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.personal-card h3 { margin: 0 0 .5rem; }
+.personal-card p,.personal-card button { margin: 0; }
+.sharing-settings [hidden] { display: none; }
+.sharing-settings input[disabled] { opacity: .75; }
+#add-connection { display: inline-flex; }
+#add-connection button { margin: 0; }
+.sharing-settings .path-example { margin-bottom: .7rem; }
+@media (max-width: 600px) {
+  .personal-card { align-items: start; flex-direction: column; }
+  .section-heading { flex-wrap: wrap; }
+  .connection-actions { align-items: start; flex-direction: column; }
+}

@@ -91,6 +91,13 @@ func (f *Factory) Open(ctx context.Context, c store.Connection, d store.Director
 	if e != nil {
 		return nil, e
 	}
+	if c.Shared && c.UserIDPrefix {
+		id, err := uuid.Parse(d.Owner)
+		if err != nil || id == uuid.Nil || id.String() != d.Owner {
+			return nil, storage.ErrInvalidPath
+		}
+	}
+	d.Prefix = c.StoragePrefix(d.Owner, d.Prefix)
 	root := d.Bucket
 	if d.Prefix != "" {
 		root += "/" + d.Prefix

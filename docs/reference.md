@@ -269,7 +269,7 @@ wildcard/private-network exceptions for user-supplied endpoints.
    credentials, addressing mode, and an explicit Read-only or Writable choice.
 2. Add a directory with its connection, bucket, and optional prefix. It may further
    restrict a writable connection to read-only. Overlapping roots on the same
-   connection/bucket are rejected; separate provider credentials can still access
+   connection/bucket are rejected within one user’s mappings; separate provider credentials can still access
    overlapping data outside the application's ownership model.
 3. Select Plain S3 or rclone crypt. Writable directories show an upload widget,
    folder creation, and confirmed delete/replace actions. Read-only directories
@@ -323,11 +323,38 @@ can re-list remotely. Downloads support one byte range, including through crypt.
 Recursive deletion, rename/move, full-text search, and resumable browser
 uploads are not supported.
 
+
+## Shared S3 connections
+
+Personal connections remain owner-managed. With `ACCESS_GATEWAY_URL` configured,
+users whose verified gateway assertion has `admin=true` see a **Shared** switch
+when adding a connection. It defaults off. Shared connections are available to
+all users of this service, but only current administrators can add, edit or remove
+them. This also applies to the original creator after demotion. Shared status
+cannot change after creation; the database enforces this invariant. Legacy proxy
+mode without signed gateway verification never grants shared-management rights.
+
+A shared connection also has **Add user ID as a prefix**, initially off. With it
+on, a mapping resolves to `s3://<bucket>/<gateway-uuid>/<mapping-prefix>/`; an empty
+mapping prefix resolves to the user's UUID root. The UUID root sits outside
+rclone encryption, preserving compatible crypt layouts within each user's root.
+This switch cannot change while any user has an attached mapping. Detach mappings
+to change it; no S3 objects are moved or deleted. Prefix-off connections allow
+users mapping the same bucket/prefix to access the same objects.
+
+Mappings, encryption passwords and recovery records remain personal. Users never
+receive the shared S3 credentials. Files and Notes own independent connection
+records: sharing within one service does not copy settings into the other.
+The storage form previews the effective path when choosing a connection.
+
 ## Secret storage and recovery
 
 S3 credentials and rclone crypt passwords are immutable, owner-scoped records in
 PostgreSQL's `service_secrets` table. Connection and directory references have
-composite foreign keys that prevent cross-owner references. A PostgreSQL backup
+composite foreign keys that bind credentials to the connection creator and crypt
+secrets to the directory owner. Connection mappings may reference an owned
+personal connection or an administrator-managed shared connection; a locking
+database trigger enforces that scope. A PostgreSQL backup
 includes both configuration and recovery secrets; there is no runtime secret
 volume, host directory, or separately managed encryption key.
 

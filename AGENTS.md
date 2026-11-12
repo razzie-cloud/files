@@ -26,11 +26,20 @@ same-origin framing and retains byte ranges; browser format support varies.
 Audio/video playback must stop and release its source when closing, navigating
 between previews, or replacing the listing through HTMX.
 
-User identity comes only from proxy-supplied X-Auth-Request-User UUIDs. Every
-metadata lookup is owner-scoped. Management traffic must pass through the gateway.
+User identity comes only from proxy-supplied X-Auth-Request-User UUIDs.
+Directory/share metadata lookups are owner-scoped.
+Connections admit owned personal or shared records; only a signed gateway admin
+may create/edit/remove shared connections, including the original creator. Shared
+status is immutable. User-ID prefixing is shared-only and locks while any user
+has an attached directory. Resolve credentials using the connection creator, crypt
+secrets using the directory owner, and physical prefixes using the directory
+owner UUID. Preserve database scope/prefix triggers and mapping revision checks.
+Management traffic must pass through the gateway.
 Public shares use a separate SHARE_ORIGIN hostname and capability-only router;
 never accept proxy identity there. Only the random share-token lookup is unscoped;
-use its persisted owner for all subsequent metadata and secret reads. Shares are
+use its persisted owner to resolve the directory and its available connection.
+Read S3 credentials under the connection creator and crypt secrets under the
+share/directory owner. Shares are
 immutable and bound to directory IDs with deletion cascading; never resolve a
 share by directory name or physical S3 location. Public operations are read-only.
 Optional share expiration is checked on every public request, including cache hits

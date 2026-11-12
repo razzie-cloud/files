@@ -53,7 +53,7 @@ type view struct {
 	Connections                                 []store.Connection
 	Directories                                 []store.Directory
 	Connection                                  *store.Connection
-	ConnectionForm, ConnectionDialog            bool
+	ConnectionForm, ConnectionDialog, Admin     bool
 	Directory                                   *store.Directory
 	Entries                                     []storage.Entry
 	Crumbs                                      []crumb
@@ -172,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), userKey{}, user))
+		r = r.WithContext(store.WithAdmin(r.Context(), s.identityVerifier.IsAdmin(r)))
 		logging.Fields(r.Context(), "owner_user_id", user.ID)
 		if r.Method == "POST" {
 			if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.Config.Origin {
@@ -206,6 +207,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 		v.LandingOrigin = "https://razzie.cloud"
 	}
 	v.User = user(r)
+	v.Admin = store.IsAdmin(r.Context())
 	v.UploadLimit = s.Config.MaxUploadBytes
 	v.UploadFileLimit = maxUploadFiles
 	v.ShareEnabled = s.Config.ShareOrigin != ""
@@ -233,6 +235,9 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 	case errors.Is(e, store.ErrNotFound), errors.Is(e, storage.ErrNotFound):
 		status = 404
 		message = "Not found."
+	case errors.Is(e, store.ErrForbidden):
+		status = 403
+		message = "Administrator required for shared connections."
 	case errors.Is(e, store.ErrConflict), errors.Is(e, storage.ErrConflict):
 		status = 409
 		message = "Configuration changed, name already exists, or directory is not empty. Refresh and try again."
@@ -326,6 +331,10 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, e, 500)
 			return
 		}
+		if c.Shared && !store.IsAdmin(r.Context()) {
+			s.fail(w, r, store.ErrForbidden, 403)
+			return
+		}
 		v.Connection = &c
 		v.ConnectionForm = true
 	}
@@ -335,6 +344,13 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 	owner := user(r).ID
 	c := store.Connection{Owner: owner}
 	var credentials secrets.Value
+	if r.PathValue("id") == "" {
+		c.Shared = checked(r, "shared")
+		if c.Shared && !store.IsAdmin(r.Context()) {
+			s.fail(w, r, store.ErrForbidden, 403)
+			return
+		}
+	}
 	if id := r.PathValue("id"); id != "" {
 		var e error
 		c, e = s.Repo.Connection(r.Context(), owner, id)
@@ -342,16 +358,33 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, e, 500)
 			return
 		}
+		if c.Shared && !store.IsAdmin(r.Context()) {
+			s.fail(w, r, store.ErrForbidden, 403)
+			return
+		}
+		if _, submitted := r.PostForm["shared"]; submitted && checked(r, "shared") != c.Shared {
+			s.fail(w, r, store.ErrConflict, 409)
+			return
+		}
 		if c.Revision != revision(r) {
 			s.fail(w, r, store.ErrConflict, 409)
 			return
 		}
-		credentials, e = s.Secrets.Get(r.Context(), owner, c.SecretRef)
+		credentials, e = s.Secrets.Get(r.Context(), c.Owner, c.SecretRef)
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
 		}
 	}
+	if checked(r, "user_id_prefix") && !c.Shared {
+		s.fail(w, r, errors.New("User ID prefixes require a shared connection."), 422)
+		return
+	}
+	if c.InUse && c.UserIDPrefix != checked(r, "user_id_prefix") {
+		s.fail(w, r, store.ErrConflict, 409)
+		return
+	}
+	c.UserIDPrefix = checked(r, "user_id_prefix")
 	c.Name = r.FormValue("name")
 	c.Provider = r.FormValue("provider")
 	c.Endpoint = strings.TrimSpace(r.FormValue("endpoint"))
@@ -387,7 +420,7 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errors.New("Access key and secret key are required."), 422)
 		return
 	}
-	ref, e := s.Secrets.Put(r.Context(), owner, credentials)
+	ref, e := s.Secrets.Put(r.Context(), c.Owner, credentials)
 	if e != nil {
 		s.fail(w, r, e, 500)
 		return
@@ -407,6 +440,9 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) removeConnection(w http.ResponseWriter, r *http.Request) {
 	c, e := s.Repo.Connection(r.Context(), user(r).ID, r.PathValue("id"))
+	if e == nil && c.Shared && !store.IsAdmin(r.Context()) {
+		e = store.ErrForbidden
+	}
 	if e == nil {
 		e = s.Repo.RemoveConnection(r.Context(), c.Owner, c.ID, revision(r))
 	}
@@ -430,6 +466,13 @@ func (s *Server) directoryForm(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
+		}
+	}
+	if d.ID == "" {
+		for _, c := range connections {
+			if c.ID == r.URL.Query().Get("connection") {
+				d.ConnectionID = c.ID
+			}
 		}
 	}
 	s.render(w, r, view{Page: "directory-form", Directory: &d, Connections: connections})
@@ -475,6 +518,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
+	d.ConnectionRevision = c.Revision
 	keys := secrets.Value{}
 	if d.EncryptionMode == "rclone_crypt" {
 		keys.Password = r.FormValue("crypt_password")
@@ -483,7 +527,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, errors.New("Enter a crypt password and valid crypt options."), 422)
 			return
 		}
-		credentials, e := s.Secrets.Get(r.Context(), owner, c.SecretRef)
+		credentials, e := s.Secrets.Get(r.Context(), c.Owner, c.SecretRef)
 		if e != nil {
 			s.fail(w, r, e, 500)
 			return
@@ -573,7 +617,7 @@ func (s *Server) open(r *http.Request, write bool) (store.Directory, store.Conne
 		return d, c, nil, errReadOnly
 	}
 	logging.Fields(r.Context(), "directory_id", d.ID, "connection_id", c.ID)
-	credentials, e := s.Secrets.Get(r.Context(), d.Owner, c.SecretRef)
+	credentials, e := s.Secrets.Get(r.Context(), c.Owner, c.SecretRef)
 	if e != nil {
 		return d, c, nil, e
 	}
@@ -661,7 +705,7 @@ func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
-	d := store.Directory{Bucket: r.FormValue("bucket"), Prefix: strings.TrimSuffix(r.FormValue("prefix"), "/"), EncryptionMode: "none"}
+	d := store.Directory{Owner: user(r).ID, Bucket: r.FormValue("bucket"), Prefix: strings.TrimSuffix(r.FormValue("prefix"), "/"), EncryptionMode: "none"}
 	if !rclonestorage.ValidateBucket(d.Bucket) {
 		s.fail(w, r, errors.New("Enter a bucket to test."), 422)
 		return

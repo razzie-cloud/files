@@ -1,5 +1,43 @@
 # Files design concept
 
+## Shared S3 connection concept
+
+New standalone previews: [administrator](shared-connections-admin.html),
+[regular user](shared-connections-member.html),
+[dark administrator](dark/shared-connections-admin.html) and
+[dark regular user](dark/shared-connections-member.html).
+Production now implements the shared connection controls and path behavior.
+These pages remain independent static review fixtures.
+
+- **Add connection** starts personal. Administrators see **Shared**, off by
+  default. Enabling it reveals **Add user ID as a prefix**, also off by default.
+- Edit shows a disabled Shared switch for administrators, preserving the
+  creation-time choice. Personal connections never show the user-prefix option.
+  Regular users can manage their personal connections and use shared ones;
+  shared credentials and editing controls are absent from their view.
+- Shared cards show prefix-on and prefix-off examples. **Use connection** opens
+  a path preview with bucket and directory prefix. With the option on, the path
+  is `s3://<bucket>/<gateway-user-uuid>/<directory-prefix>/`. Without it, users
+  mapping the same location can access the same S3 objects. Directory settings
+  remain personal. Encryption and other directory options use existing setup.
+- The prefix option locks while any user has a directory attached. The sample
+  shared edits show this fixed state; unused shared connections can change it.
+  No S3 objects are moved or deleted.
+- Files and Notes manage independent connections; sharing means all users of
+  the service, not synchronizing credentials between the two services.
+
+Cancel/Escape/Close return focus. Error fixtures retain drafts, and saves return
+fixed sample cards for the current role. No input values are sent or saved;
+every form fetches a static fragment with `hx-params="none"`. Access controls
+here are visual fixtures, not live authorization.
+
+Screenshots: [admin list](shared-connections-admin-desktop.png),
+[user list](shared-connections-member-desktop.png),
+[add dialog](shared-connection-add-desktop.png),
+[edit dialog](shared-connection-edit-desktop.png),
+[path preview](shared-connection-path-desktop.png) and
+[mobile add](shared-connection-add-mobile.png). Matching images live in `dark/`.
+
 Serve the **Razzie Cloud parent directory** with
 `python3 -m http.server 8765 --bind 127.0.0.1`, then open
 <http://127.0.0.1:8765/files/docs/mockups/index.html>.

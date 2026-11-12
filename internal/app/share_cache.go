@@ -108,7 +108,7 @@ func (s *Server) loadShare(ctx context.Context, id string) (v shareSnapshot, err
 	if err != nil {
 		return v, err
 	}
-	v.Credentials, err = s.Secrets.Get(ctx, v.Share.Owner, v.Connection.SecretRef)
+	v.Credentials, err = s.Secrets.Get(ctx, v.Connection.Owner, v.Connection.SecretRef)
 	if err == nil && v.Directory.EncryptionMode == "rclone_crypt" {
 		v.Crypt, err = s.Secrets.Get(ctx, v.Share.Owner, v.Directory.CryptSecretRef)
 	}

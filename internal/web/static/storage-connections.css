@@ -60,3 +60,8 @@ body:has(#connection-dialog[open]) { overflow: hidden; }
 
 /* Use the local Pico chevron under the services' strict image CSP. */
 :root { --pico-icon-chevron: url("/static/chevron.svg"); }
+
+[data-shared-options][hidden] { display: none; }
+.storage-path { overflow-wrap: anywhere; font-size: .8rem; color: var(--pico-muted-color); }
+.connection-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.connection-actions>* { margin: 0; }

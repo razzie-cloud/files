@@ -189,3 +189,9 @@ func (v *Verifier) Verify(r *http.Request, requireAdmin bool) error {
 	}
 	return nil
 }
+
+// IsAdmin grants administrative UI and writes only for a verified signed claim.
+// Legacy trusted-proxy mode has no authenticated role and never grants admin.
+func (v *Verifier) IsAdmin(r *http.Request) bool {
+	return v != nil && v.Verify(r, true) == nil
+}
