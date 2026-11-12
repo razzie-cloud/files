@@ -145,7 +145,7 @@
 <form class="connection-form" data-connection-form method="post" action="{{if .ID}}/connections/{{.ID}}/update{{else}}/connections{{end}}" hx-post="{{if .ID}}/connections/{{.ID}}/update{{else}}/connections{{end}}" hx-target="#connection-feedback" hx-disabled-elt="find button[type=submit]">
 <input type="hidden" name="revision" value="{{.Revision}}">
 <div class="form-fields">
-{{if $.Admin}}<section class="field-section" aria-labelledby="connection-sharing-title"><h3 id="connection-sharing-title">Sharing</h3>
+{{if $.Admin}}<section class="field-section connection-sharing" aria-labelledby="connection-sharing-title"><h3 id="connection-sharing-title">Sharing</h3>
 <label><input id="connection-shared" name="shared" type="checkbox" role="switch" {{if .Shared}}checked{{end}} {{if .ID}}disabled{{end}} aria-describedby="connection-sharing-help"> Shared</label>
 <small id="connection-sharing-help">{{if .ID}}Shared status is fixed when the connection is created.{{else}}Make this connection available to all users. Only administrators can manage it. This choice is fixed after creation.{{end}}</small>
 {{if or .Shared (not .ID)}}<div data-shared-options {{if not .Shared}}hidden{{end}}>

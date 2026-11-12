@@ -11,6 +11,7 @@
 .personal-card h3 { margin: 0 0 .5rem; }
 .personal-card p,.personal-card button { margin: 0; }
 .sharing-settings [hidden] { display: none; }
+.connection-form .sharing-settings { border-top: 0; border-bottom: 1px solid var(--pico-muted-border-color); margin-top: 0; padding: 0 0 .2rem; }
 .sharing-settings input[disabled] { opacity: .75; }
 #add-connection { display: inline-flex; }
 #add-connection button { margin: 0; }
