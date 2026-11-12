@@ -1,6 +1,9 @@
 package store
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 type adminKey struct{}
 
@@ -24,4 +27,17 @@ func (c Connection) StoragePrefix(owner, prefix string) string {
 		return owner + "/" + prefix
 	}
 	return prefix
+}
+
+// ErrBucket reports an attempt to override a connection's fixed bucket.
+var ErrBucket = errors.New("bucket is fixed by the connection")
+
+func (c Connection) BucketFor(requested string) (string, error) {
+	if c.Bucket == "" {
+		return requested, nil
+	}
+	if requested != "" && requested != c.Bucket {
+		return "", ErrBucket
+	}
+	return c.Bucket, nil
 }

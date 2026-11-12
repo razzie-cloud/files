@@ -19,9 +19,9 @@ var ErrNotFound = errors.New("not found")
 var ErrConflict = errors.New("configuration changed, name already exists, or backing prefixes overlap")
 
 type Connection struct {
-	ID, Owner, Name, Provider, Endpoint, Region, AccessMode, SecretRef string
-	PathStyle, Shared, UserIDPrefix, InUse                             bool
-	Revision                                                           int64
+	ID, Owner, Name, Provider, Endpoint, Region, AccessMode, SecretRef, Bucket string
+	PathStyle, Shared, UserIDPrefix, InUse                                     bool
+	Revision                                                                   int64
 }
 type Directory struct {
 	ID, Owner, ConnectionID, Name, Bucket, Prefix, EncryptionMode string
@@ -62,13 +62,13 @@ func translate(err error) error {
 	return err
 }
 
-const connectionColumns = "id,owner_user_id,name,provider,endpoint,region,path_style,access_mode,secret_ref,revision,shared,user_id_prefix,EXISTS(SELECT 1 FROM directories WHERE connection_id=storage_connections.id)"
+const connectionColumns = "id,owner_user_id,name,provider,endpoint,region,path_style,access_mode,secret_ref,revision,shared,user_id_prefix,EXISTS(SELECT 1 FROM directories WHERE connection_id=storage_connections.id),bucket"
 const directoryColumns = "id,owner_user_id,connection_id,name,bucket,prefix,read_only,encryption_mode,filename_encryption,directory_encryption,filename_encoding,suffix,COALESCE(crypt_secret_ref,''),revision"
 
 type scanner interface{ Scan(...any) error }
 
 func scanConnection(row scanner) (c Connection, err error) {
-	err = row.Scan(&c.ID, &c.Owner, &c.Name, &c.Provider, &c.Endpoint, &c.Region, &c.PathStyle, &c.AccessMode, &c.SecretRef, &c.Revision, &c.Shared, &c.UserIDPrefix, &c.InUse)
+	err = row.Scan(&c.ID, &c.Owner, &c.Name, &c.Provider, &c.Endpoint, &c.Region, &c.PathStyle, &c.AccessMode, &c.SecretRef, &c.Revision, &c.Shared, &c.UserIDPrefix, &c.InUse, &c.Bucket)
 	return c, translate(err)
 }
 func scanDirectory(row scanner) (d Directory, err error) {
@@ -118,11 +118,11 @@ func (s *Store) SaveConnection(ctx context.Context, c *Connection) error {
 	}
 	if c.ID == "" {
 		c.ID = uuid.NewString()
-		_, e := s.DB.ExecContext(ctx, `INSERT INTO storage_connections(id,owner_user_id,name,provider,endpoint,region,path_style,access_mode,secret_ref,shared,user_id_prefix) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, c.ID, c.Owner, c.Name, c.Provider, c.Endpoint, c.Region, c.PathStyle, c.AccessMode, c.SecretRef, c.Shared, c.UserIDPrefix)
+		_, e := s.DB.ExecContext(ctx, `INSERT INTO storage_connections(id,owner_user_id,name,provider,endpoint,region,path_style,access_mode,secret_ref,shared,user_id_prefix,bucket) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, c.ID, c.Owner, c.Name, c.Provider, c.Endpoint, c.Region, c.PathStyle, c.AccessMode, c.SecretRef, c.Shared, c.UserIDPrefix, c.Bucket)
 		c.Revision = 1
 		return translate(e)
 	}
-	res, e := s.DB.ExecContext(ctx, `UPDATE storage_connections SET name=$3,provider=$4,endpoint=$5,region=$6,path_style=$7,access_mode=$8,secret_ref=$9,user_id_prefix=$11,revision=revision+1,updated_at=now() WHERE id=$1 AND owner_user_id=$2 AND revision=$10`, c.ID, c.Owner, c.Name, c.Provider, c.Endpoint, c.Region, c.PathStyle, c.AccessMode, c.SecretRef, c.Revision, c.UserIDPrefix)
+	res, e := s.DB.ExecContext(ctx, `UPDATE storage_connections SET name=$3,provider=$4,endpoint=$5,region=$6,path_style=$7,access_mode=$8,secret_ref=$9,user_id_prefix=$11,bucket=$12,revision=revision+1,updated_at=now() WHERE id=$1 AND owner_user_id=$2 AND revision=$10`, c.ID, c.Owner, c.Name, c.Provider, c.Endpoint, c.Region, c.PathStyle, c.AccessMode, c.SecretRef, c.Revision, c.UserIDPrefix, c.Bucket)
 	if e != nil {
 		return translate(e)
 	}
@@ -211,15 +211,19 @@ func (s *Store) SaveDirectory(ctx context.Context, d *Directory) error {
 		return e
 	}
 	defer tx.Rollback()
-	if _, e = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", lockID(d.ConnectionID+"/"+d.Bucket)); e != nil {
+	c, e := scanConnection(tx.QueryRowContext(ctx, "SELECT "+connectionColumns+" FROM storage_connections WHERE id=$1 AND (owner_user_id=$2 OR shared) FOR SHARE", d.ConnectionID, d.Owner))
+	if e != nil {
 		return e
 	}
-	var connectionRevision int64
-	if e = tx.QueryRowContext(ctx, "SELECT revision FROM storage_connections WHERE id=$1 AND (owner_user_id=$2 OR shared) FOR SHARE", d.ConnectionID, d.Owner).Scan(&connectionRevision); e != nil {
-		return translate(e)
-	}
-	if d.ConnectionRevision != 0 && d.ConnectionRevision != connectionRevision {
+	if d.ConnectionRevision != 0 && d.ConnectionRevision != c.Revision {
 		return ErrConflict
+	}
+	d.Bucket, e = c.BucketFor(d.Bucket)
+	if e != nil {
+		return e
+	}
+	if _, e = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock($1)", lockID(d.ConnectionID+"/"+d.Bucket)); e != nil {
+		return e
 	}
 	rows, e := tx.QueryContext(ctx, "SELECT prefix FROM directories WHERE connection_id=$1 AND bucket=$2 AND owner_user_id=$3", d.ConnectionID, d.Bucket, d.Owner)
 	if e != nil {

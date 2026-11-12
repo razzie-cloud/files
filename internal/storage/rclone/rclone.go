@@ -60,6 +60,11 @@ func defaults(backend string, overrides configmap.Simple) (configmap.Simple, err
 	return m, nil
 }
 func (f *Factory) Open(ctx context.Context, c store.Connection, d store.Directory, credentials, keys secrets.Value) (storage.FS, error) {
+	var bucketErr error
+	d.Bucket, bucketErr = c.BucketFor(d.Bucket)
+	if bucketErr != nil {
+		return nil, bucketErr
+	}
 	if e := Initialize(); e != nil {
 		return nil, e
 	}

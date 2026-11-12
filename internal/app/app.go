@@ -235,6 +235,9 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 	case errors.Is(e, store.ErrNotFound), errors.Is(e, storage.ErrNotFound):
 		status = 404
 		message = "Not found."
+	case errors.Is(e, store.ErrBucket):
+		status = 422
+		message = "Bucket is fixed by the connection."
 	case errors.Is(e, store.ErrForbidden):
 		status = 403
 		message = "Administrator required for shared connections."
@@ -324,7 +327,7 @@ func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
-	v := view{Page: "connections", Connections: all, ConnectionForm: r.URL.Path == "/connections/new", Connection: &store.Connection{Provider: "Other", PathStyle: true, AccessMode: "read_only"}}
+	v := view{Page: "connections", Connections: all, ConnectionForm: r.URL.Path == "/connections/new", Connection: &store.Connection{Provider: "Other", AccessMode: "read_only"}}
 	if id := r.PathValue("id"); id != "" {
 		c, e := s.Repo.Connection(r.Context(), user(r).ID, id)
 		if e != nil {
@@ -385,12 +388,17 @@ func (s *Server) saveConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.UserIDPrefix = checked(r, "user_id_prefix")
+	c.Bucket = strings.TrimSpace(r.FormValue("bucket"))
 	c.Name = r.FormValue("name")
 	c.Provider = r.FormValue("provider")
 	c.Endpoint = strings.TrimSpace(r.FormValue("endpoint"))
 	c.Region = strings.TrimSpace(r.FormValue("region"))
 	c.PathStyle = checked(r, "path_style")
 	c.AccessMode = r.FormValue("access_mode")
+	if c.Bucket != "" && !rclonestorage.ValidateBucket(c.Bucket) {
+		s.fail(w, r, errors.New("Enter a valid fixed S3 bucket name, or leave it blank."), 422)
+		return
+	}
 	if !validName(c.Name) || (c.Provider != "AWS" && c.Provider != "Other" && c.Provider != "Backblaze") || (c.AccessMode != "read_only" && c.AccessMode != "writable") || len(c.Region) > 100 {
 		s.fail(w, r, errors.New("Enter a name, provider, region, and access mode."), 422)
 		return
@@ -475,7 +483,16 @@ func (s *Server) directoryForm(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.render(w, r, view{Page: "directory-form", Directory: &d, Connections: connections})
+	v := view{Page: "directory-form", Directory: &d, Connections: connections}
+	if d.ID == "" {
+		for _, c := range connections {
+			if c.ID == d.ConnectionID {
+				v.Connection = &c
+				d.Bucket = c.Bucket
+			}
+		}
+	}
+	s.render(w, r, v)
 }
 func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 	owner := user(r).ID
@@ -505,7 +522,7 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := store.Directory{Owner: owner, ConnectionID: r.FormValue("connection_id"), Name: r.FormValue("name"), Bucket: r.FormValue("bucket"), Prefix: strings.TrimSuffix(r.FormValue("prefix"), "/"), ReadOnly: checked(r, "read_only"), EncryptionMode: r.FormValue("encryption_mode"), FilenameEncryption: r.FormValue("filename_encryption"), DirectoryEncryption: checked(r, "directory_encryption"), FilenameEncoding: r.FormValue("filename_encoding"), Suffix: r.FormValue("suffix")}
-	if !validName(d.Name) || !rclonestorage.ValidateBucket(d.Bucket) {
+	if !validName(d.Name) {
 		s.fail(w, r, errors.New("Enter a directory name and valid S3 bucket name."), 422)
 		return
 	}
@@ -516,6 +533,15 @@ func (s *Server) saveDirectory(w http.ResponseWriter, r *http.Request) {
 	c, e := s.Repo.Connection(r.Context(), owner, d.ConnectionID)
 	if e != nil {
 		s.fail(w, r, e, 500)
+		return
+	}
+	d.Bucket, e = c.BucketFor(d.Bucket)
+	if e != nil {
+		s.fail(w, r, e, 422)
+		return
+	}
+	if !rclonestorage.ValidateBucket(d.Bucket) {
+		s.fail(w, r, errors.New("Enter a valid S3 bucket name."), 422)
 		return
 	}
 	d.ConnectionRevision = c.Revision
@@ -706,6 +732,11 @@ func (s *Server) testConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := store.Directory{Owner: user(r).ID, Bucket: r.FormValue("bucket"), Prefix: strings.TrimSuffix(r.FormValue("prefix"), "/"), EncryptionMode: "none"}
+	d.Bucket, e = c.BucketFor(d.Bucket)
+	if e != nil {
+		s.fail(w, r, e, 422)
+		return
+	}
 	if !rclonestorage.ValidateBucket(d.Bucket) {
 		s.fail(w, r, errors.New("Enter a bucket to test."), 422)
 		return

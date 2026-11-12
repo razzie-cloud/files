@@ -71,8 +71,21 @@
     document.querySelectorAll('[data-effective-path]').forEach(output => {
       const form = output.closest('form');
       const option = form.querySelector('[name=connection_id]')?.selectedOptions[0];
+      const bucketField = form.querySelector('[name=bucket]');
+      const fixed = option?.dataset.fixedBucket || '';
+      if (fixed) {
+        if (bucketField.dataset.bucketFixed !== 'true') bucketField.dataset.freeBucket = bucketField.value;
+        bucketField.value = fixed;
+        bucketField.dataset.bucketFixed = 'true';
+      } else if (bucketField.dataset.bucketFixed === 'true') {
+        bucketField.value = bucketField.dataset.freeBucket || '';
+        delete bucketField.dataset.bucketFixed;
+      }
+      bucketField.readOnly = Boolean(fixed);
+      const help = form.querySelector('[data-connection-bucket-help]');
+      if (help) help.hidden = !fixed;
       if (!option?.value) { output.textContent = ''; return; }
-      const bucket = form.querySelector('[name=bucket]').value.trim() || 'bucket';
+      const bucket = bucketField.value.trim() || 'bucket';
       const prefix = form.querySelector('[name=prefix]').value.trim().replace(/^\/+|\/+$/g, '');
       const userPrefix = option.dataset.userIdPrefix === 'true' ? output.dataset.owner + '/' : '';
       const suffix = option.dataset.shared === 'true' && !userPrefix ? ' Other users mapping this location access the same objects.' : '';

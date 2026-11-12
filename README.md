@@ -107,3 +107,22 @@ Mappings, encryption passwords and recovery records remain personal. Users never
 receive the shared S3 credentials. Files and Notes own independent connection
 records: sharing within one service does not copy settings into the other.
 The storage form previews the effective path when choosing a connection.
+
+### Fixed buckets and connection actions
+
+Every connection card has **Use connection**, which opens directory/notebook
+setup with that connection selected. Connection setup includes **Fixed bucket
+(optional)**. Leave it blank to choose a bucket for each mapping. When set, the
+mapping form fills that bucket and makes it read-only; changing the connection
+updates this field and restores a draft bucket when returning to an unrestricted
+connection. Handlers, storage constructors and locking SQL triggers reject bucket
+overrides, including bucket-access tests. Omitted bucket values resolve to the
+fixed bucket on the server.
+
+A connection can be restricted to a bucket only if every existing mapping, across
+all users, already uses it. Incompatible restrictions return a conflict. Clearing
+the restriction preserves each mapping's saved bucket and never moves S3 data.
+
+New connections default **Use path-style bucket addressing** off. Existing saved
+choices are preserved. Enable it for providers that need it, including the local
+`http://s3-demo:9000` fixture.

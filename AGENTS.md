@@ -74,3 +74,11 @@ Broker discovery uses BROKER_TOKEN_FILE / --broker-token-file and optional
 BROKER_CA_FILE / --broker-ca-file. Discovery URLs carry only public client IDs.
 Keep internal/brokerdiscovery and its tests synchronized across first-party apps.
 Never log discovery URLs or raw HTTP errors; no authentication fallback is allowed.
+
+Connections support an optional fixed bucket, on personal and shared records.
+Use `Connection.BucketFor` before mapping validation/storage access and under the
+connection row lock when saving mappings. Never trust the read-only form field.
+SQL triggers reject mapping overrides and connection restrictions incompatible
+with any user's existing mappings. Clearing a restriction retains saved mapping
+buckets. New connection forms and SQL defaults use path_style=false; retain
+existing saved choices and explicitly enable it for the local S3 demo.

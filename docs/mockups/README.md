@@ -1,5 +1,13 @@
 # Files design concept
 
+## Connection bucket controls
+
+Every connection has **Use connection**, including personal sample cards. New
+connection forms include **Fixed bucket (optional)** and default path-style
+addressing off. The shared Cloud storage sample fixes `cloud-bucket`; its mapping
+preview shows a read-only bucket. Team archive and Personal storage keep the
+bucket editable. Existing edit fixtures retain their saved addressing choice.
+
 ## Shared S3 connection concept
 
 New standalone previews: [administrator](shared-connections-admin.html),

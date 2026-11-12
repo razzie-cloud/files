@@ -32,7 +32,7 @@ func TestSharedStoragePrefixesAndCrypt(t *testing.T) {
 	for _, prefix := range []bool{false, true} {
 		for _, mode := range []string{"none", "rclone_crypt"} {
 			t.Run(fmt.Sprintf("prefix=%v/%s", prefix, mode), func(t *testing.T) {
-				c := store.Connection{Provider: "Other", Endpoint: server.URL, Region: "us-east-1", PathStyle: true, Shared: true, UserIDPrefix: prefix}
+				c := store.Connection{Provider: "Other", Endpoint: server.URL, Region: "us-east-1", PathStyle: true, Bucket: "shared-test", Shared: true, UserIDPrefix: prefix}
 				d := store.Directory{Bucket: "shared-test", Prefix: fmt.Sprintf("%t/%s", prefix, mode), EncryptionMode: mode, FilenameEncryption: "standard", DirectoryEncryption: true, FilenameEncoding: "base32", Suffix: ".bin"}
 				credentials := secrets.Value{AccessKey: "test", SecretKey: "test-secret"}
 				crypt := secrets.Value{Password: "compatible shared fixture password"}

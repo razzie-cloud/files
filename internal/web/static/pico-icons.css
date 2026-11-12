@@ -1,0 +1,2 @@
+/* Resolve Pico icons locally before its default data URLs can be painted. */
+html:root { --pico-icon-chevron: url("/static/chevron.svg"); }
