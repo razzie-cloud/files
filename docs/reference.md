@@ -67,8 +67,8 @@ PDF responses allow framing only by the same origin; the application continues
 to deny framing of its management and public browsing pages. No conversion
 service or external document viewer receives file contents.
 
-Audio browser regression checks: `python3 tests/audio-browser.py` with Playwright
-and Chromium installed. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects
+Audio browser regression checks: `go run tests/audio-browser.go` with Go and
+Chromium installed. `CHROMIUM_EXECUTABLE_PATH` optionally selects
 an existing Chromium executable. The checks use disposable HTTP fixtures and
 cover playback, seeking, errors, cleanup, and HTMX on desktop/mobile layouts.
 
@@ -225,7 +225,7 @@ at most 64 KiB, and does not establish full-file integrity or codec support.
 Ordinary download/preview semantics are unchanged.
 
 Sender tests: `node tests/cast-controller.test.cjs` (Node 22+). Browser adapter
-checks: `python tests/cast-browser.py` with Playwright and Chromium installed.
+checks: `go run tests/cast-browser.go` with Go and Chromium installed.
 Neither mocks nor SDK acknowledgments prove rendering on a physical receiver.
 
 ## Configuration

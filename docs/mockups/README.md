@@ -47,7 +47,7 @@ Screenshots: [admin list](shared-connections-admin-desktop.png),
 [mobile add](shared-connection-add-mobile.png). Matching images live in `dark/`.
 
 Serve the **Razzie Cloud parent directory** with
-`python3 -m http.server 8765 --bind 127.0.0.1`, then open
+`go run scripts/serve.go`, then open
 <http://127.0.0.1:8765/files/docs/mockups/index.html>.
 
 | Screen | File | Review focus |
