@@ -175,8 +175,14 @@ func (b *Browser) receive(route func(Request) Response) {
 			go func(raw json.RawMessage) {
 				defer func() {
 					if r := recover(); r != nil {
+						// Navigation or an HTMX replacement can cancel a request
+						// between interception and our fixture's response.
+						message := fmt.Sprint(r)
+						if strings.Contains(message, "Fetch.fulfillRequest:") && strings.Contains(message, "Invalid InterceptionId") {
+							return
+						}
 						b.mu.Lock()
-						b.errors = append(b.errors, fmt.Sprint(r))
+						b.errors = append(b.errors, message)
 						b.mu.Unlock()
 					}
 				}()
@@ -240,10 +246,23 @@ func (b *Browser) Viewport(width, height int) {
 	b.Call("Emulation.setDeviceMetricsOverride", map[string]any{"width": width, "height": height, "deviceScaleFactor": 1, "mobile": false})
 }
 func (b *Browser) Navigate(url string) {
-	b.Call("Page.navigate", map[string]any{"url": url})
+	var navigation struct {
+		LoaderID string `json:"loaderId"`
+	}
+	check(json.Unmarshal(b.Call("Page.navigate", map[string]any{"url": url}), &navigation))
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if string(b.Eval(`location.href===`+Quote(url)+`&&document.readyState==='complete'`)) == "true" {
+		var tree struct {
+			FrameTree struct {
+				Frame struct {
+					LoaderID string `json:"loaderId"`
+				} `json:"frame"`
+			} `json:"frameTree"`
+		}
+		check(json.Unmarshal(b.Call("Page.getFrameTree", nil), &tree))
+		// location can change while the previous document still reports
+		// complete. Wait for the requested document to commit first.
+		if (navigation.LoaderID == "" || tree.FrameTree.Frame.LoaderID == navigation.LoaderID) && string(b.Eval(`location.href===`+Quote(url)+`&&document.readyState==='complete'`)) == "true" {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)

@@ -316,7 +316,9 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 }
 func (s *Server) done(w http.ResponseWriter, r *http.Request, destination string) {
 	if r.Header.Get("HX-Request") == "true" {
-		location, _ := json.Marshal(map[string]string{"path": destination, "target": "#main", "swap": "innerHTML"})
+		// Follow-up reads share the panel's request group, so a later user
+		// navigation can cancel a response that is still loading after a save.
+		location, _ := json.Marshal(map[string]string{"path": destination, "source": "#main", "target": "#main", "swap": "innerHTML"})
 		w.Header().Set("HX-Location", string(location))
 		w.WriteHeader(200)
 		return

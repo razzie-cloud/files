@@ -7,6 +7,11 @@ function configureCrypt() {
 }
 document.addEventListener("change", event => { if (event.target.matches("[data-encryption]")) configureCrypt(); });
 document.addEventListener("htmx:afterSwap", configureCrypt);
+document.addEventListener("htmx:afterSwap", event => {
+  // Bind visible links/forms before HTMX's delayed settle phase, including a
+  // second folder click made immediately after the listing appears.
+  if (event.detail.target?.id === "main") htmx.process(event.detail.target);
+});
 document.addEventListener("DOMContentLoaded", configureCrypt);
 document.addEventListener("htmx:beforeSwap", event => {
   if (event.detail.xhr.status >= 400) { event.detail.shouldSwap = true; event.detail.isError = false; }
@@ -24,7 +29,15 @@ document.addEventListener("click", event => {
 // top-level navigation to let the gateway establish a fresh app session.
 document.addEventListener("htmx:sendError", event => {
   if (event.detail.elt.closest("[data-connection-form], [data-file-action-form]") || event.detail.elt.matches("[data-folders-url]")) return;
-  location.assign(location.pathname + location.search);
+  const navigation = event.detail.elt.closest('a[hx-boost="true"]');
+  location.assign(navigation?.href || location.pathname + location.search);
+});
+
+// Keep the header in place while orienting keyboard users to the new view.
+document.addEventListener("htmx:afterSettle", event => {
+  if (event.detail.target?.id !== "main" || !event.detail.requestConfig?.boosted) return;
+  const heading = event.detail.target.querySelector("h1");
+  if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
 });
 
 // Let the rest of a file row activate its name link, keeping actions independent.

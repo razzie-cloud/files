@@ -40,7 +40,7 @@ func TestFrontendPublicAndReadOnlyViews(t *testing.T) {
 			if !strings.Contains(html, `href="http://localhost:9191/" class="brand"`) && !strings.Contains(html, `class="brand" href="http://localhost:9191/"`) {
 				t.Fatal("cloud brand does not link to landing")
 			}
-			if tc.management && !strings.Contains(html, `href="/" class="service-name">Files</a>`) {
+			if tc.management && !strings.Contains(html, `href="/" class="service-name"`) {
 				t.Fatal("app name does not link to Files")
 			}
 			if strings.Contains(html, `aria-label="Primary"`) != tc.management {

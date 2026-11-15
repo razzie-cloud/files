@@ -23,6 +23,13 @@ actions. Small screens stack panels and file rows, with wrapping icon actions.
 Colors follow the browser's light/dark preference; no theme preference is stored.
 HTMX refreshes navigation together with the main view. Public shares use a simpler
 read-only shell without management navigation or owner identity metadata.
+Folder and parent links, breadcrumbs, pagination, directory cards and settings
+links update the main panel through HTMX while retaining the header. Public-share
+folder navigation follows the same pattern within the capability URL. The address
+bar follows navigation, and direct URLs remain complete pages. History snapshots
+stay disabled; Back/Forward loads a fresh page. Downloads, previews, dialogs and
+cross-app links retain their separate behavior. Keyboard focus moves to the new
+view heading after panel navigation.
 The header aligns with its content frame, including on public share pages.
 Anchor navigation briefly outlines the destination panel. File browsing has
 Upload and New folder shortcuts to the corresponding panels. Repeated navigation
