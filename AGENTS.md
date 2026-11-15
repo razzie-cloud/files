@@ -17,6 +17,13 @@ Use PicoCSS switches (`type="checkbox" role="switch"`) for every binary toggle,
 including confirmations and Cast options. Exclude switches from text-input sizing
 rules so Pico retains their dimensions and focus/checked styling.
 
+The shared account header uses `static/account-header.css`, identical to Gateway
+and Notes: shield, gateway-linked username and inline Administrator badge only
+for the verified signed admin role. Public shares omit identity. Use the public
+issuer through `gatewayidentity.AccountURL`, never the private discovery URL;
+keep its helper/tests synchronized with Notes. Settings stay in sidebar navigation.
+See parent docs/brand/README.md's signed-in account-header contract for future UI.
+
 File previews reuse the authorized download route for personal files and public
 shares. Keep UTF-8 text/Markdown reads bounded to 2 MiB and escape plain text.
 Goldmark must retain safe rendering defaults; raw HTML, document images, and
