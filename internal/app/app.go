@@ -66,6 +66,8 @@ type view struct {
 	ShareDirectory                              bool
 	Shares                                      []store.Share
 	ShareURL                                    string
+	FileAction                                  *fileActionView
+	Folders                                     []folderNode
 }
 
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
@@ -134,6 +136,12 @@ func (s *Server) Handler() http.Handler {
 	handle("POST /directories/{id}/mkdir", s.mutate)
 	handle("POST /directories/{id}/delete-file", s.mutate)
 	handle("POST /directories/{id}/rmdir", s.mutate)
+	handle("GET /directories/{id}/rename", s.fileActionForm)
+	handle("GET /directories/{id}/move", s.fileActionForm)
+	handle("POST /directories/{id}/rename", s.moveFile)
+	handle("POST /directories/{id}/move", s.moveFile)
+	handle("GET /directories/{id}/folders", s.folderChildren)
+	handle("POST /directories/{id}/move-folder", s.createMoveFolder)
 	handle("GET /directories/{id}/shares", s.shareForm)
 	handle("POST /directories/{id}/shares", s.createShare)
 	handle("POST /directories/{id}/cast", s.createCast)
@@ -220,6 +228,9 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 			name = "connection-dialog"
 			v.ConnectionDialog = true
 		}
+		if v.Page == "file-action" && r.Header.Get("HX-Target") == "file-action-dialog-content" {
+			name = "file-action-form"
+		}
 	}
 	if e := s.templates.ExecuteTemplate(w, name, v); e != nil {
 		logging.Fields(r.Context(), "template", name)
@@ -253,6 +264,8 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 	case errors.Is(e, storage.ErrCrypto):
 		status = 422
 		message = "Cannot decrypt this directory or file. Check the crypt settings."
+	case errors.Is(e, storage.ErrMoveIncomplete):
+		message = "The file was copied, but its original could not be removed. Both copies may exist. Refresh both folders before retrying."
 	case errors.Is(e, context.DeadlineExceeded):
 		status = 504
 		message = "Storage request timed out."
@@ -271,6 +284,18 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 		logging.FailKind(r.Context(), slog.LevelWarn, "storage", "crypto")
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Header.Get("HX-Request") == "true" {
+		switch r.Header.Get("HX-Target") {
+		case "file-action-feedback", "folder-create-feedback", "file-action-dialog-content":
+			target := r.Header.Get("HX-Target")
+			w.Header().Set("HX-Retarget", "#"+target)
+			w.WriteHeader(status)
+			if err := s.templates.ExecuteTemplate(w, "file-action-error", view{Message: message}); err != nil {
+				logging.Fail(r.Context(), slog.LevelError, "render_template", err)
+			}
+			return
+		}
+	}
 	if r.Header.Get("HX-Request") == "true" && (r.Header.Get("HX-Target") == "connection-feedback" || r.Header.Get("HX-Target") == "connection-dialog-content") {
 		target := "#connection-feedback"
 		if r.Header.Get("HX-Target") == "connection-dialog-content" {
@@ -688,6 +713,12 @@ func (s *Server) browse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := view{Page: "browse", Directory: &d, Connection: &c, Path: key, Writable: d.Writable(c), Crumbs: []crumb{{d.Name, "/directories/" + d.ID}}}
+	switch r.URL.Query().Get("file_action") {
+	case "moved":
+		v.Message = "File moved."
+	case "renamed":
+		v.Message = "File renamed."
+	}
 	parent := ""
 	for _, part := range strings.Split(key, "/") {
 		if part == "" {
@@ -788,6 +819,10 @@ func (s *Server) writeLock(r *http.Request, d store.Directory, c store.Connectio
 	if e != nil {
 		return nil, e
 	}
+	return s.checkWriteLock(r, d, c, unlock)
+}
+
+func (s *Server) checkWriteLock(r *http.Request, d store.Directory, c store.Connection, unlock func()) (func(), error) {
 	current, e := s.Repo.Directory(r.Context(), d.Owner, d.ID)
 	if e == nil {
 		var conn store.Connection

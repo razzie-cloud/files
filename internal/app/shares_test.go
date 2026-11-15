@@ -207,7 +207,7 @@ func TestPublicSharingIsolationAndPassword(t *testing.T) {
 			t.Fatal("traversal reached storage", relative, w.Code)
 		}
 	}
-	for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir"} {
+	for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir", "rename", "move", "move-folder"} {
 		if w := request("POST", base+"/"+action, cfg.ShareOrigin, "", cookie); w.Code != 404 {
 			t.Fatal("public write route exposed", action, w.Code)
 		}

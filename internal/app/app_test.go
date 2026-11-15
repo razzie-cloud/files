@@ -55,7 +55,7 @@ func TestReadOnlyBlocksEveryMutation(t *testing.T) {
 				if e != nil {
 					t.Fatal(e)
 				}
-				for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir"} {
+				for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir", "rename", "move", "move-folder"} {
 					request := httptest.NewRequest("POST", "/directories/"+uuid.NewString()+"/"+action, strings.NewReader("path=file&confirm=on"))
 					request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 					request.Header.Set("Origin", server.Config.Origin)
@@ -148,7 +148,7 @@ func TestHTTPStorageWorkflow(t *testing.T) {
 			if rec := request("GET", base, nil, uuid.NewString()); rec.Code != 404 {
 				t.Fatal("cross-user browsing accepted")
 			}
-			for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir", "update", "remove", "test"} {
+			for _, action := range []string{"upload", "mkdir", "delete-file", "rmdir", "rename", "move", "move-folder", "update", "remove", "test"} {
 				if rec := request("POST", base+"/"+action, url.Values{}, uuid.NewString()); rec.Code != 404 {
 					t.Fatalf("cross-owner %s returned %d", action, rec.Code)
 				}

@@ -18,6 +18,7 @@ var ErrTooLarge = errors.New("directory or upload exceeds configured limit")
 var ErrInvalidPath = errors.New("invalid relative path")
 var ErrConflict = errors.New("object exists or directory is not empty")
 var ErrCrypto = errors.New("cannot decrypt this directory or file; check crypt settings")
+var ErrMoveIncomplete = errors.New("file copied but source removal failed")
 
 type Entry struct {
 	Name, Path string
@@ -37,6 +38,7 @@ type FS interface {
 	Put(context.Context, string, io.Reader) error
 	Mkdir(context.Context, string) error
 	Remove(context.Context, string, bool) error
+	Move(context.Context, string, string) error
 	PhysicalKey(string) string
 	Close()
 }

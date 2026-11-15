@@ -19,7 +19,7 @@ The executable embeds HTMX 2.0.8, PicoCSS 2.1.1, templates, and local assets.
 The desktop interface has sidebar navigation, directory cards, Pico breadcrumbs,
 and a file table beside directory information and upload/new-folder forms.
 Connection, directory, and share settings keep their existing form fields and
-actions. Small screens stack panels and keep wide tables in scrollable regions.
+actions. Small screens stack panels and file rows, with wrapping icon actions.
 Colors follow the browser's light/dark preference; no theme preference is stored.
 HTMX refreshes navigation together with the main view. Public shares use a simpler
 read-only shell without management navigation or owner identity metadata.
@@ -326,8 +326,45 @@ multipart uploads. Directory deletion is empty-only; bucket deletion is forbidde
 Listings are bounded and paginated 100 entries per page. A directory over the
 entry limit produces an explicit error, not a silently truncated view. Refreshes
 can re-list remotely. Downloads support one byte range, including through crypt.
-Recursive deletion, rename/move, full-text search, and resumable browser
-uploads are not supported.
+Recursive deletion, folder rename/move, moves between root directories,
+full-text search, and resumable browser uploads are not supported.
+
+### Renaming and moving files
+
+Browse actions use local line icons with accessible names and hover/focus
+tooltips. Rename and Move appear only for files in writable directories; public
+shares and read-only connections/directories expose no write controls. Rename
+selects the filename stem while keeping the extension visible and editable.
+Normal GET forms remain available when opening the action URL directly.
+
+Move opens a native dialog whose folder tree includes the active root and its
+descendants. Branches load on demand and obey the ordinary listing limit. The
+current folder starts selected, with Move disabled until another destination is
+chosen. Create subfolder here creates a single child of the selected folder and
+selects it. Names cannot contain separators, traversal components or control
+characters. Errors retain the draft and destination; Cancel, Close and Escape
+return focus. A successful operation refreshes the source listing with feedback.
+
+GET `/directories/{id}/rename` and `/move` take the source `path`. Their POST
+forms require `path` and the mapping `revision`; Rename also takes `name`, while
+Move takes the relative `destination` folder (empty for the root).
+GET `/directories/{id}/folders?path=...` returns one level of child folders.
+POST `/directories/{id}/move-folder` requires `destination`, child `name`, and
+`revision`. All use the current owner-scoped mapping and guarded storage client;
+there is no destination connection, bucket or root ID parameter.
+
+Rename and Move use rclone's S3/crypt copy support, falling back to a streamed
+rclone upload if server-side copying is unavailable. The source is removed only
+after copying succeeds. Existing destination files and folders are rejected.
+Both physical paths are locked in a consistent order on one PostgreSQL session,
+and current access/revisions are rechecked after acquisition. These locks
+coordinate Files replicas, not external S3 writers or separately configured
+connections. S3 copy/delete is not an atomic rename; use provider versioning and
+coordinate external writers as for uploads. A failed source removal reports that
+both copies may exist and does not delete the destination to roll back.
+
+Shares remain bound to their existing relative paths: an individual file share
+does not follow a rename/move, and folder shares reflect their current contents.
 
 
 

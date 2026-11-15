@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"hash/fnv"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ type Repository interface {
 	SaveDirectory(context.Context, *Directory) error
 	RemoveDirectory(context.Context, string, string, int64) error
 	Lock(context.Context, string) (func(), error)
+	LockMany(context.Context, []string) (func(), error)
 }
 type Store struct{ DB *sql.DB }
 
@@ -258,23 +260,39 @@ func (s *Store) SaveDirectory(ctx context.Context, d *Directory) error {
 }
 func lockID(key string) int64 { h := fnv.New64a(); h.Write([]byte(key)); return int64(h.Sum64()) }
 func (s *Store) Lock(ctx context.Context, key string) (func(), error) {
+	return s.LockMany(ctx, []string{key})
+}
+
+// Hold all object locks on one session, ordered by advisory-lock ID. Acquiring
+// separate pooled connections for each key can exhaust the pool under load.
+func (s *Store) LockMany(ctx context.Context, keys []string) (func(), error) {
+	ids := make([]int64, 0, len(keys))
+	for _, key := range keys {
+		ids = append(ids, lockID(key))
+	}
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
 	conn, e := s.DB.Conn(ctx)
 	if e != nil {
 		return nil, e
 	}
-	if _, e = conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", lockID(key)); e != nil {
-		// Cancellation can race with acquiring the lock. Never return a possibly
-		// locked session to the pool; closing the physical connection releases it.
-		conn.Raw(func(any) error { return driver.ErrBadConn })
-		conn.Close()
-		return nil, e
+	for _, id := range ids {
+		if _, e = conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", id); e != nil {
+			// Cancellation can race with acquisition. Discard the session to
+			// release this lock and every lock already acquired by this call.
+			conn.Raw(func(any) error { return driver.ErrBadConn })
+			conn.Close()
+			return nil, e
+		}
 	}
 	return func() { // Unlock even if the request context has been canceled.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", lockID(key))
-		if err != nil {
-			conn.Raw(func(any) error { return driver.ErrBadConn })
+		for i := len(ids) - 1; i >= 0; i-- {
+			if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", ids[i]); err != nil {
+				conn.Raw(func(any) error { return driver.ErrBadConn })
+				break
+			}
 		}
 		conn.Close()
 	}, nil

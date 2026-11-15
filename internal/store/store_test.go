@@ -128,3 +128,35 @@ func TestOwnershipRevisionsAndPrefixes(t *testing.T) {
 		release()
 	}
 }
+
+func TestLockManyUsesOneSessionAndReleasesCanceledAcquisitions(t *testing.T) {
+	repo := &store.Store{DB: testutil.Database(t)}
+	ctx := context.Background()
+	repo.DB.SetMaxOpenConns(1)
+	deadline, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	release, err := repo.LockMany(deadline, []string{"source", "destination", "source"})
+	if err != nil {
+		t.Fatal("multi-key acquisition used more than one session", err)
+	}
+	release()
+	repo.DB.SetMaxOpenConns(3)
+	release, err = repo.Lock(ctx, "source")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline, cancel = context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	if unlock, err := repo.LockMany(deadline, []string{"destination", "source"}); err == nil {
+		unlock()
+		t.Fatal("overlapping acquisition did not wait")
+	}
+	release()
+	deadline, cancel = context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	unlock, err := repo.LockMany(deadline, []string{"source", "destination"})
+	if err != nil {
+		t.Fatal("canceled acquisition leaked a session lock", err)
+	}
+	unlock()
+}

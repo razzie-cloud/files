@@ -2,12 +2,16 @@
 
 A private web file manager for S3-compatible storage, including Backblaze B2.
 Map a bucket or prefix to a named directory, then browse, upload, download, and
-preview files. Directories can be read-only or writable, with optional rclone
+preview, rename, and move files. Moves stay within the selected root directory.
+Directories can be read-only or writable, with optional rclone
 crypt encryption. Share files and folders through read-only links with optional
 passwords and expiration.
 
 Open text, formatted Markdown, PDFs, images, audio, and video directly in the
 file preview dialog. Media format support depends on your browser.
+
+File actions use icons with hover and keyboard-focus tooltips. **Move** opens a
+folder tree and lets you create a subfolder at the selected destination.
 
 File contents stay in S3. PostgreSQL stores configuration, S3 credentials, and
 crypt passwords. Files uses access-gateway for sign-in and user identity; it has

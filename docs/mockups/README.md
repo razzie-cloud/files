@@ -1,5 +1,78 @@
 # Files design concept
 
+## File actions, rename and move
+
+Open the [interactive light preview](file-actions.html) or
+[dark preview](dark/file-actions.html). Run `go run scripts/serve.go` from the
+parent checkout and visit
+<http://127.0.0.1:8765/files/docs/mockups/file-actions.html>.
+
+The file browser replaces repeated action labels with line icons. Hover or focus
+an icon for its tooltip; each control also has an accessible name. On narrow
+screens the table becomes stacked rows and icons wrap. Open, Download, Share,
+Cast and confirmed deletion remain represented alongside the new file actions.
+Existing sharing/Cast/folder controls open explanatory placeholders here.
+
+- **Rename** opens a native dialog and selects the filename stem, retaining the
+  visible, editable extension. The preview updates the sample row after saving.
+- **Move** opens a collapsible folder hierarchy scoped to **Workspace**. The root
+  itself and any child folder can be destinations. The current folder starts
+  selected, with Move disabled until another destination is chosen. Other root
+  directories are absent; moving across roots is unsupported.
+- **Create subfolder here** adds a child of the selected destination and selects
+  it for the move. Folder creation can be repeated to build nested destinations.
+  The selected destination's full path stays visible below the tree.
+- Conflict fixtures retain the name/destination draft and offer no overwrite.
+  Invalid names and duplicate sample folders are blocked. Cancel, Close and
+  Escape return focus; removing a row moves focus to its result message.
+- **Read-only preview** hides writes and retains opening, downloads and sharing.
+  Theme navigation preserves that state. Folder renames/moves are outside this
+  concept; folder rows retain Share and Remove empty folder.
+
+Changes exist only in browser memory and reset on reload. HTMX fetches authored
+static success/conflict/folder fragments with `hx-params="none"`; names and file
+selections never enter requests. These are mockups, not implemented storage
+operations. No backend, production templates or production assets were changed.
+
+Review screenshots (matching dark images live in `dark/`):
+[browser](file-actions-desktop.png), [move picker](file-move-desktop.png),
+[create destination](file-move-create-desktop.png), [rename](file-rename-desktop.png),
+[mobile browser](file-actions-mobile.png), [mobile move](file-move-mobile.png),
+and [mobile folder creation](file-move-create-mobile.png).
+
+Verification: headless Chromium checked light/dark and writable/read-only at
+320, 390, 768 and 1440 pixels. Rename/save, invalid names, retained conflict
+drafts, Cancel/Close/Escape, focus return, keyboard tooltips, tree expand/collapse,
+root destinations, subfolder creation, duplicate folders, move/delete results,
+and theme round trips passed. No observed browser/CSP errors, failed responses,
+external requests, writes or transmitted drafts occurred. Desktop/mobile
+screenshots were visually reviewed. Static checks covered all five new
+pages/fragments and their 57 local references, unique IDs and external scripts/
+styles; parent and component whitespace checks passed. No service Go checks or
+live S3/auth/Cast acceptance ran for this mockup-only change.
+
+The folder-creation sizing follow-up overrides Pico's full-width dialog submit
+button on desktop: the name field expands beside a content-sized button.
+Mobile explicitly retains stacked full-width controls. Chromium verified control
+proportions/alignment, overflow and folder creation in both themes at all four
+widths; the four affected screenshots were refreshed and visually reviewed.
+
+Production Files now implements the reviewed file actions, Rename/Move dialogs,
+lazy folder branches and inline destination-folder creation. These static
+previews remain separate fixtures. See the
+[live behavior and limits](../reference.md#renaming-and-moving-files) and the
+parent [implementation verification](../../../docs/frontend-mockups.md#files-rename-and-move-concept).
+
+Share now uses a balanced three-node symbol; Cast uses a screen outline with a
+clear cutout around the broadcast waves. The production templates, both themes,
+sharing forms and detail fragments use matching inline SVG geometry. The
+affected desktop/mobile screenshots were refreshed. Chromium checked 24 changed
+mockup layouts and 24 rendered production layouts at 320/390/768/1440 pixels,
+including tooltips and Share/Cast fixture actions. No unexpected browser/CSP
+errors or failed responses occurred. Files build, vet, tests and race tests
+passed; PostgreSQL integration skipped with `TEST_DATABASE_URL` unset for this
+icon-only follow-up. No production storage or Cast hardware was used.
+
 ## Connection bucket controls
 
 Every connection has **Use connection**, including personal sample cards. New

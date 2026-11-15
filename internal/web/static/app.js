@@ -23,7 +23,7 @@ document.addEventListener("click", event => {
 // Cross-origin auth redirects cannot be followed by an HTMX XHR. Repeat as a
 // top-level navigation to let the gateway establish a fresh app session.
 document.addEventListener("htmx:sendError", event => {
-  if (event.detail.elt.closest("[data-connection-form]")) return;
+  if (event.detail.elt.closest("[data-connection-form], [data-file-action-form]") || event.detail.elt.matches("[data-folders-url]")) return;
   location.assign(location.pathname + location.search);
 });
 

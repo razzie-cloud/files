@@ -20,7 +20,10 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type Request struct{ URL, Method, PostData string }
+type Request struct {
+	URL, Method, PostData string
+	Headers               map[string]string
+}
 type Response struct {
 	Body    []byte
 	Type    string
@@ -109,21 +112,30 @@ func Start(route func(Request) Response) *Browser {
 		panic("Chromium did not start; check CHROMIUM_EXECUTABLE_PATH")
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
-	res, e := client.Get("http://127.0.0.1:" + port + "/json/list")
-	check(e)
-	var targets []struct {
-		URL  string `json:"webSocketDebuggerUrl"`
-		Type string `json:"type"`
-	}
-	e = json.NewDecoder(res.Body).Decode(&targets)
-	res.Body.Close()
-	check(e)
 	var endpoint string
-	for _, t := range targets {
-		if t.Type == "page" {
-			endpoint = t.URL
+	for time.Now().Before(deadline) {
+		res, err := client.Get("http://127.0.0.1:" + port + "/json/list")
+		if err != nil {
+			time.Sleep(25 * time.Millisecond)
+			continue
+		}
+		var targets []struct {
+			URL  string `json:"webSocketDebuggerUrl"`
+			Type string `json:"type"`
+		}
+		err = json.NewDecoder(res.Body).Decode(&targets)
+		res.Body.Close()
+		check(err)
+		for _, target := range targets {
+			if target.Type == "page" {
+				endpoint = target.URL
+				break
+			}
+		}
+		if endpoint != "" {
 			break
 		}
+		time.Sleep(25 * time.Millisecond)
 	}
 	if endpoint == "" {
 		panic("Chromium has no page target")

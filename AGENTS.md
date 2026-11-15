@@ -88,3 +88,13 @@ requiring a directory-marker HEAD. Keep normal directory-marker behavior for
 filesystem operations. Probe the same fixed bucket/user-prefixed location through
 the guarded rclone client, never the bucket root as a fallback. Missing buckets
 and denied listing access remain errors; probing must never create objects.
+
+File rename/move stays inside one owner-scoped directory mapping. Use the mapped
+rclone S3/crypt handle, reject existing file/folder destinations, lock both
+physical keys with Repository.LockMany on one session, and recheck access and
+mapping/connection revisions after acquiring locks. Copy must finish before
+source removal; a removal failure preserves the destination and reports that
+both copies may exist. Keep lazy folder listing and subfolder creation within
+the same root, with bounded listings and read-only enforcement. HTMX errors must
+retain dialog drafts/tree selection; keep normal form fallbacks and public shares
+read-only. File shares remain path-bound and do not follow moved/renamed files.

@@ -329,6 +329,57 @@ func (h *handle) Remove(ctx context.Context, key string, dir bool) error {
 	return cleanError(o.Remove(ctx))
 }
 
+// Move operates on this handle's single mapped root, including its crypt layer.
+// Callers serialize both paths with other writes. S3 copy/delete is not atomic;
+// never remove the source unless copying has completed successfully.
+func (h *handle) Move(ctx context.Context, source, destination string) error {
+	if _, err := storage.Path(source, false); err != nil {
+		return err
+	}
+	if _, err := storage.Path(destination, false); err != nil {
+		return err
+	}
+	if source == destination {
+		return storage.ErrConflict
+	}
+	o, err := h.fs.NewObject(ctx, source)
+	if err != nil {
+		return cleanError(err)
+	}
+	parent := path.Dir(destination)
+	if parent == "." {
+		parent = ""
+	}
+	entries, err := h.List(ctx, parent)
+	if err != nil && !(parent == "" && errors.Is(err, storage.ErrNotFound)) {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Name == path.Base(destination) {
+			return storage.ErrConflict
+		}
+	}
+	err = fs.ErrorCantCopy
+	if copy := h.fs.Features().Copy; copy != nil {
+		_, err = copy(ctx, o, destination)
+	}
+	if errors.Is(err, fs.ErrorCantCopy) {
+		in, openErr := o.Open(ctx)
+		if openErr != nil {
+			return cleanError(openErr)
+		}
+		_, err = h.fs.Put(ctx, in, object.NewStaticObjectInfo(destination, o.ModTime(ctx), o.Size(), true, nil, h.fs))
+		in.Close()
+	}
+	if err != nil {
+		return cleanError(err)
+	}
+	if err = o.Remove(ctx); err != nil {
+		return storage.ErrMoveIncomplete
+	}
+	return nil
+}
+
 // ValidateBucket forbids remote syntax, separators, and implicit bucket discovery.
 func ValidateBucket(bucket string) bool {
 	return len(bucket) >= 3 && len(bucket) <= 63 && !strings.ContainsAny(bucket, "/:\\\x00 ") && bucket == strings.ToLower(bucket) && strings.Trim(bucket, "abcdefghijklmnopqrstuvwxyz0123456789.-") == ""
