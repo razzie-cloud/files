@@ -270,6 +270,9 @@ wildcard/private-network exceptions for user-supplied endpoints.
 
 ## Using storage
 
+The empty home page offers directory setup when an owned personal or shared
+connection is available; it offers connection setup only when none are available.
+
 1. Open Connections. The first connection form appears inline. Once a
    connection exists, use **Add connection** or a card's **Edit connection** to
    open the form in a native dialog. Supply an S3 provider, endpoint, signing region,

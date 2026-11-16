@@ -348,7 +348,15 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, e, 500)
 		return
 	}
-	s.render(w, r, view{Page: "home", Directories: dirs})
+	v := view{Page: "home", Directories: dirs}
+	if len(dirs) == 0 {
+		v.Connections, e = s.Repo.Connections(r.Context(), user(r).ID)
+		if e != nil {
+			s.fail(w, r, e, 500)
+			return
+		}
+	}
+	s.render(w, r, v)
 }
 func (s *Server) connections(w http.ResponseWriter, r *http.Request) {
 	all, e := s.Repo.Connections(r.Context(), user(r).ID)
