@@ -243,7 +243,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, e error, status in
 	s.failView(w, r, e, status, view{})
 }
 func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, status int, v view) {
-	message := "Request failed. Check the storage configuration and try again."
+	message := "Request failed. Check the connection and directory settings and try again."
 	switch {
 	case errors.Is(e, store.ErrNotFound), errors.Is(e, storage.ErrNotFound):
 		status = 404
@@ -687,7 +687,7 @@ func (s *Server) open(r *http.Request, write bool) (store.Directory, store.Conne
 	return d, c, fs, e
 }
 
-var errReadOnly = errors.New("This storage is read-only.")
+var errReadOnly = errors.New("This directory or its connection is read-only.")
 
 func (s *Server) operationError(w http.ResponseWriter, r *http.Request, e error) {
 	if errors.Is(e, errReadOnly) {

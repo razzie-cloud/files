@@ -1,5 +1,9 @@
 # Files design concept
 
+Saved S3 provider settings are called **connections** throughout these previews.
+The primary connection list and first-connection desktop screenshots were
+refreshed in both themes; other screenshots record earlier design reviews.
+
 ## File actions, rename and move
 
 Open the [interactive light preview](file-actions.html) or
@@ -77,8 +81,8 @@ icon-only follow-up. No production storage or Cast hardware was used.
 
 Every connection has **Use connection**, including personal sample cards. New
 connection forms include **Fixed bucket (optional)** and default path-style
-addressing off. The shared Cloud storage sample fixes `cloud-bucket`; its mapping
-preview shows a read-only bucket. Team archive and Personal storage keep the
+addressing off. The shared Cloud connection sample fixes `cloud-bucket`; its mapping
+preview shows a read-only bucket. Team archive and Personal connection keep the
 bucket editable. Existing edit fixtures retain their saved addressing choice.
 
 ## Shared S3 connection concept
@@ -125,10 +129,10 @@ Serve the **Razzie Cloud parent directory** with
 
 | Screen | File | Review focus |
 | --- | --- | --- |
-| Directory overview | [index.html](index.html) | Directory cards, shared shell, storage connections |
+| Directory overview | [index.html](index.html) | Directory cards, shared shell, connections |
 | Nested file browser | [browse.html](browse.html) | Pico breadcrumbs, file table, contextual details and uploads |
 | Intermediate folders | [workspace.html](workspace.html), [projects.html](projects.html), [folder.html](folder.html) | Clickable ancestor navigation and empty folder layout |
-| Storage connections | [connections.html](connections.html) | Connection cards with Add/Edit dialogs |
+| Connections | [connections.html](connections.html) | Connection cards with Add/Edit dialogs |
 | First connection | [connections-empty.html](connections-empty.html) | Inline setup when no connections exist |
 | Add directory | [directory.html](directory.html) | Grouped setup, encryption disclosure, explanatory column |
 | Sharing | [shares.html](shares.html) | Read-only capability link form |

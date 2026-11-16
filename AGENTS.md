@@ -105,3 +105,8 @@ both copies may exist. Keep lazy folder listing and subfolder creation within
 the same root, with bounded listings and read-only enforcement. HTMX errors must
 retain dialog drafts/tree selection; keep normal form fallbacks and public shares
 read-only. File shares remain path-bound and do not follow moved/renamed files.
+
+Use **connection** for saved S3 provider settings in UI labels, help, errors and
+documentation. Reserve **storage** for the data, provider or physical location;
+do not use it as another name for a connection. Preserve existing routes, form
+fields and database identifiers when changing wording.

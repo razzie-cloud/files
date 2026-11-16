@@ -26,7 +26,7 @@ starts development dependencies only.
 
 1. Create the first administrator at <http://localhost:8080> using the bootstrap
    token from the gateway logs, then sign in.
-2. Open <http://files.localhost:8082> and add a **Storage connection** with your
+2. Open <http://files.localhost:8082> and add a **connection** with your
    S3 endpoint, region, credentials, addressing mode, and Read-only or Writable access.
 3. Add a directory using that connection, a bucket, and an optional prefix.
    Choose Plain S3 or rclone crypt, then open the directory to manage files.
@@ -110,7 +110,7 @@ users mapping the same bucket/prefix to access the same objects.
 Mappings, encryption passwords and recovery records remain personal. Users never
 receive the shared S3 credentials. Files and Notes own independent connection
 records: sharing within one service does not copy settings into the other.
-The storage form previews the effective path when choosing a connection.
+The directory form previews the effective path when choosing a connection.
 
 ### Fixed buckets and connection actions
 

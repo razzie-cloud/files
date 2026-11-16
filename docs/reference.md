@@ -135,7 +135,7 @@ shared-files.example.com {
 Use **Share** beside a file/folder, or **Sharing** in the directory toolbar.
 Leave the path empty and select Directory to share the entire mapped directory.
 Owners can list/copy links and revoke them from this page, including on read-only
-storage connections. Public pages allow read-only browsing, downloading, previewing, and casting, with
+connections. Public pages allow read-only browsing, downloading, previewing, and casting, with
 pagination and HTTP range downloads; rclone crypt decryption works normally.
 Directory shares include descendants and future contents. Links are live views:
 replacing an object at the same path changes what recipients download.
@@ -270,7 +270,7 @@ wildcard/private-network exceptions for user-supplied endpoints.
 
 ## Using storage
 
-1. Open Storage connections. The first connection form appears inline. Once a
+1. Open Connections. The first connection form appears inline. Once a
    connection exists, use **Add connection** or a card's **Edit connection** to
    open the form in a native dialog. Supply an S3 provider, endpoint, signing region,
    credentials, addressing mode, and an explicit Read-only or Writable choice.
@@ -299,7 +299,7 @@ the automated suite runs against an in-memory S3 implementation.
 When using crypt, uploads encrypt and downloads decrypt automatically through
 rclone. In **Add directory → Encryption → rclone crypt**, set **Encryption
 password (rclone password)** and **Salt password (rclone password2, optional)**.
-These belong to the directory, rather than the storage connection. Enter the
+These belong to the directory, rather than the connection. Enter the
 original passwords, before rclone obscures them for its config file; leave
 password2 empty if the remote has no salt password. Set filename encryption
 and matching advanced settings if attaching an existing rclone directory. An
@@ -415,7 +415,7 @@ users mapping the same bucket/prefix to access the same objects.
 Mappings, encryption passwords and recovery records remain personal. Users never
 receive the shared S3 credentials. Files and Notes own independent connection
 records: sharing within one service does not copy settings into the other.
-The storage form previews the effective path when choosing a connection.
+The directory form previews the effective path when choosing a connection.
 
 ## Secret storage and recovery
 
