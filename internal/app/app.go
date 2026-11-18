@@ -71,6 +71,27 @@ type view struct {
 	Folders                                     []folderNode
 }
 
+// EntrySummary describes only the entries rendered on the current listing page.
+func (v view) EntrySummary() string {
+	folders := 0
+	for _, entry := range v.Entries {
+		if entry.Directory {
+			folders++
+		}
+	}
+	count := func(n int, label string) string {
+		if n != 1 {
+			label += "s"
+		}
+		return strconv.Itoa(n) + " " + label
+	}
+	summary := count(folders, "folder") + " · " + count(len(v.Entries)-folders, "file")
+	if v.Previous != "" || v.Next != "" {
+		summary += " on this page"
+	}
+	return summary
+}
+
 func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, factory storage.Factory, policy *rclonestorage.Policy) (*Server, error) {
 	if cfg.CastShareTTL == 0 {
 		cfg.CastShareTTL = 6 * time.Hour
@@ -78,7 +99,7 @@ func New(cfg config.Config, repo store.Repository, secretStore *secrets.Store, f
 	if cfg.CastShareTTL <= 0 || cfg.CastShareTTL > 24*time.Hour {
 		return nil, errors.New("invalid Cast share lifetime")
 	}
-	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base, "mediaKind": mediaKind, "castType": castType}).ParseFS(web.Assets, "templates.html")
+	t, e := template.New("templates").Funcs(template.FuncMap{"size": size, "base": path.Base, "mediaKind": mediaKind, "fileLabel": fileLabel, "castType": castType}).ParseFS(web.Assets, "templates.html")
 	if e != nil {
 		return nil, e
 	}

@@ -1,0 +1,81 @@
+/* Recipient proposal only; shared palette and controls come from Pico/the mockup shell. */
+.recipient-page .recipient-topbar {
+  padding-inline: max(2rem, calc((100% - 1080px) / 2 + 2rem));
+}
+.recipient-brand { display: flex; align-items: center; min-width: 0; gap: .7rem; }
+.recipient-brand .brand { white-space: nowrap; }
+.recipient-page .public-workspace { width: 100%; padding-top: 3rem; }
+.share-context { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; }
+.share-context .eyebrow { margin: 0; line-height: 1.5; }
+.access-label { display: inline-flex; align-items: center; gap: .4rem; color: var(--pico-muted-color); font-size: .76rem; line-height: 1.5; white-space: nowrap; }
+.access-label .icon { width: 14px; height: 14px; }
+.shared-file-card { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding: 2rem; }
+.shared-file-identity { display: flex; align-items: center; gap: 1.2rem; min-width: 0; }
+.shared-file-icon { display: grid; place-items: center; flex: 0 0 64px; height: 72px; border: 1px solid var(--pico-muted-border-color); background: var(--pico-card-sectioning-background-color); border-radius: .6rem; color: var(--pico-muted-color); }
+.shared-file-icon .icon { width: 30px; height: 30px; }
+.shared-file-copy { min-width: 0; }
+.recipient-page h1 { font-size: 1.7rem; letter-spacing: -.04em; line-height: 1.3; margin: 0 0 .45rem; overflow-wrap: anywhere; }
+.recipient-page .file-metadata { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; font-size: .84rem; color: var(--pico-muted-color); margin: 0; }
+.shared-file-actions { display: flex; align-items: center; gap: .7rem; flex-shrink: 0; }
+.shared-file-actions button { height: 42px; line-height: 1.25; }
+.recipient-page .workspace-footer { margin-top: 2rem; padding-top: 1.15rem; }
+.recipient-heading { margin-bottom: 1.65rem; }
+.recipient-table { padding: 0; overflow: hidden; }
+.recipient-table table { width: 100%; table-layout: fixed; }
+.recipient-table th,.recipient-table td { vertical-align: middle; }
+.recipient-table th:first-child { width: auto; }
+.recipient-table th:nth-child(2) { width: 110px; }
+.recipient-table th:last-child { width: 125px; }
+.recipient-table .actions-heading { text-align: right; }
+/* Inherit table text directly: Pico redefines --pico-color on links. */
+.recipient-table .name-cell { min-width: 0; text-decoration: none; color: inherit; }
+.recipient-table .name-cell>span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.recipient-table .size-cell { color: var(--pico-muted-color); white-space: nowrap; }
+.recipient-actions { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; }
+.recipient-page .row-open { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px; margin: 0; padding: 0; border: 1px solid transparent; background: transparent; color: var(--pico-muted-color); border-radius: .4rem; }
+.recipient-page .row-open:hover { background: var(--pico-card-sectioning-background-color); border-color: var(--pico-muted-border-color); color: var(--pico-primary); }
+.recipient-page .row-open:focus-visible,.recipient-page .name-cell:focus-visible { outline: 2px solid var(--pico-primary); outline-offset: 3px; }
+.recipient-page nav[aria-label="breadcrumb"] { margin: 0 0 1.1rem; }
+.recipient-page nav[aria-label="breadcrumb"] ul { flex-wrap: wrap; margin: 0; }
+.recipient-empty { text-align: center; padding: 2.5rem 1rem; }
+.recipient-empty .file-icon { margin: 0 auto 1rem; }
+.recipient-empty p { font-size: .85rem; color: var(--pico-muted-color); margin: 0; }
+.download-feedback { margin: 1rem 0 0; font-size: .82rem; color: var(--pico-muted-color); }
+#sample-preview>article { width: calc(100% - 2rem); max-width: 650px; padding: 1.5rem; }
+#sample-preview header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: -1.5rem -1.5rem 1.5rem; padding: 1rem 1.5rem; }
+#sample-preview h2 { margin: 0; overflow-wrap: anywhere; }
+#sample-preview .preview-close { width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
+.sample-stage { display: grid; place-items: center; min-height: 200px; border-radius: .5rem; background: var(--pico-card-sectioning-background-color); }
+.sample-stage img { object-fit: contain; }
+.fixture-note { font-size: .8rem; color: var(--pico-muted-color); margin: 1rem 0 0; }
+#sample-preview footer { display: flex; justify-content: flex-end; margin: 1.5rem -1.5rem -1.5rem; padding: 1rem 1.5rem; }
+body:has(#sample-preview[open]) { overflow: hidden; }
+[hidden] { display: none !important; }
+@media(max-width:760px) {
+  .recipient-page .recipient-topbar { padding: .8rem 1rem; min-height: 72px; height: auto; }
+  .recipient-brand { gap: .4rem; flex-wrap: wrap; }
+  .recipient-brand .brand { font-size: 1rem; gap: .4rem; }
+  .recipient-brand .brand-mark { width: 38px; height: 38px; }
+  .recipient-brand .service-name { margin: 0; padding-left: .65rem; font-size: .8rem; }
+  .recipient-page .public-workspace { padding: 2rem 1rem; }
+  .shared-file-card { flex-direction: column; align-items: stretch; gap: 1.6rem; padding: 1.4rem; }
+  .shared-file-identity { gap: 1rem; }
+  .shared-file-icon { flex-basis: 48px; height: 56px; }
+  .shared-file-icon .icon { width: 25px; height: 25px; }
+  .recipient-page h1 { font-size: 1.4rem; }
+  .shared-file-actions { gap: .6rem; }
+  .shared-file-actions button { flex: 1; padding-inline: .6rem; }
+  .recipient-table th,.recipient-table td { padding: .8rem .65rem; }
+  .recipient-table th:nth-child(2) { width: 74px; }
+  .recipient-table th:last-child { width: 90px; }
+  .recipient-table .name-cell { gap: .5rem; font-size: .8rem; }
+  .recipient-actions { gap: .15rem; }
+  .recipient-page .row-open { width: 32px; height: 36px; flex-basis: 32px; }
+  .recipient-table .file-icon { width: 27px; height: 31px; }
+  .recipient-table .size-cell { font-size: .72rem; }
+}
+@media(max-width:360px) {
+  .recipient-table th:nth-child(2) { width: 65px; }
+  .recipient-table th:last-child { width: 76px; }
+  .recipient-table th,.recipient-table td { padding-inline: .4rem; }
+}

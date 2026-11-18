@@ -1,5 +1,53 @@
 # Files design concept
 
+## Shared recipient layout proposal
+
+[Single file](public-file.html) · [Dark single file](dark/public-file.html) ·
+[Folder](public.html) · [Dark folder](dark/public.html)
+
+The recipient shell shows **Read-only** once, as a quiet lock label beside
+**Shared with you**. Header, table caption and footer no longer repeat access
+restrictions. A single file uses one card with its filename, format, size and
+labeled Preview/Download controls; the one-row table and duplicate filename are
+removed. Folder shares retain a compact table and show item counts beneath the
+folder title. The public shell has no account or management controls.
+
+Filename and folder links inherit the table's neutral text color in both themes.
+The color follow-up passed eight layouts at 320/390/768/1440 pixels, including
+focused links and names loaded through HTMX; the four folder screenshots were
+refreshed and visually reviewed. Browser/CSP/console and whitespace checks passed.
+
+The preview bar switches between file/folder examples and light/dark themes.
+Assets opens a sample nested folder; Exports shows an empty folder. Breadcrumbs
+return to the share root, and theme links preserve the current folder. Preview
+opens a native dialog with a bundled sample image; Close/Escape returns focus.
+Download fetches an authored HTMX receipt. These fixtures do not download the
+original GIF or persist changes. Production now implements the reviewed layout
+with real share routes and the existing preview, Cast and pagination behavior;
+these mockups remain independent sample fixtures.
+
+Screenshots: [dark proposal](dark/public-file-proposal.png),
+[light proposal](public-file-proposal.png),
+[dark mobile file](dark/public-file-mobile.png),
+[light mobile file](public-file-mobile.png),
+[dark folder](dark/public-desktop.png),
+[light folder](public-desktop.png),
+[dark mobile folder](dark/public-mobile.png),
+[light mobile folder](public-mobile.png), and
+[mobile preview](dark/public-preview-mobile.png).
+
+Verification: headless Brave/Chromium rendered the four full pages at
+320/390/768/1440 pixels (16 layout cases). Checks covered one heading and one
+access label, loaded images, page overflow, file/folder/theme links, folder
+breadcrumbs, empty state, deep links, preview/Close/Escape/focus return, keyboard
+activation, download receipts and button/icon/context alignment. Twelve saved
+screenshots were visually inspected. Local references and Git whitespace were
+checked. No unexpected browser/CSP/console errors or failed responses occurred;
+all observed page requests were local GETs. The temporary browser/server exited
+after verification. No Go service checks or live S3/authentication acceptance ran
+for this static-only proposal.
+
+
 Saved S3 provider settings are called **connections** throughout these previews.
 The primary connection list and first-connection desktop screenshots were
 refreshed in both themes; other screenshots record earlier design reviews.
@@ -136,7 +184,7 @@ Serve the **Razzie Cloud parent directory** with
 | First connection | [connections-empty.html](connections-empty.html) | Inline setup when no connections exist |
 | Add directory | [directory.html](directory.html) | Grouped setup, encryption disclosure, explanatory column |
 | Sharing | [shares.html](shares.html) | Read-only capability link form |
-| Recipient view | [public.html](public.html) | Simplified public shell |
+| Recipient view | [public-file.html](public-file.html), [public.html](public.html) | Single-file card and folder table with one access label |
 
 [Overview screenshot](index-desktop.png) · [File browser screenshot](browse-desktop.png)
 

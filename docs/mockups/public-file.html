@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0}'>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer"><title>Shared file · Razzie Cloud design preview</title>
+<link rel="icon" href="../../internal/web/static/razzie-cloud-logo.png">
+<link rel="stylesheet" href="../../internal/web/static/pico.min.css"><link rel="stylesheet" href="mockup.css">
+
+<link rel="stylesheet" href="public.css">
+<script defer src="../../internal/web/static/htmx.min.js"></script><script defer src="public.js"></script>
+</head>
+<body class="recipient-page">
+<a href="#main" class="skip-link">Skip to content</a>
+<div class="preview-bar"><strong>DESIGN PREVIEW</strong><span>Sample data · actions are simulated</span><a href="public-file.html" aria-current=page>Single file</a><a href="public.html" >Folder</a><a data-theme-link href="dark/public-file.html">Dark mode</a></div>
+<header class="topbar recipient-topbar"><div class="recipient-brand"><a class="brand" href="index.html"><img class="brand-mark" src="../../internal/web/static/razzie-cloud-logo.png" width="46" height="46" alt="">Razzie Cloud</a><span class="service-name">Shared files</span></div></header>
+<main id="main" class="public-workspace">
+<div class="share-context"><p class="eyebrow">Shared with you</p><span class="access-label"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4m-4 5v2"/></svg>Read-only</span></div>
+<article class="shared-file-card"><div class="shared-file-identity"><span class="shared-file-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 6-6 4 4 3-3 5 5"/></svg></span><div class="shared-file-copy"><h1>Tq95IjZ2ncDg.gif</h1><p class="file-metadata">GIF image <span aria-hidden="true">·</span> 3.4 MiB</p></div></div><div class="shared-file-actions"><button class="secondary outline" data-preview="Tq95IjZ2ncDg.gif"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Preview</button><button hx-get="fragments/public-download.html" hx-target="#file-feedback"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>Download</button></div></article>
+<div id="file-feedback" role="status"></div>
+<footer class="workspace-footer"><span>Shared with Razzie Cloud Files</span></footer>
+</main>
+<dialog id="sample-preview" aria-labelledby="preview-title"><article><header><h2 id="preview-title">File preview</h2><button class="secondary outline preview-close" data-close-preview aria-label="Close preview"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></header><div class="sample-stage"><img src="../../internal/web/static/razzie-cloud-logo.png" width="160" height="160" alt="Razzie Cloud sample image"></div><p class="fixture-note">Illustrative preview using a local sample. The shared file is not included in this mockup.</p><footer><button class="secondary outline" data-close-preview>Close</button></footer></article></dialog>
+</body>
+</html>

@@ -90,3 +90,22 @@ func mediaKind(name string) string {
 	t, _, _ := strings.Cut(mediaType(name), "/")
 	return t
 }
+
+func fileLabel(name string) string {
+	ext := strings.ToUpper(strings.TrimPrefix(path.Ext(name), "."))
+	switch mediaKind(name) {
+	case "image", "audio", "video":
+		return ext + " " + mediaKind(name)
+	case "pdf":
+		return "PDF document"
+	case "document":
+		if mediaType(name) == "text/markdown" {
+			return "Markdown document"
+		}
+		return "Text document"
+	}
+	if ext != "" {
+		return ext + " file"
+	}
+	return "File"
+}

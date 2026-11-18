@@ -29,7 +29,7 @@ func TestMediaActions(t *testing.T) {
 			audio := "folder/audio + % árvíz.MP3"
 			var body bytes.Buffer
 			err := srv.templates.ExecuteTemplate(&body, "page", view{
-				Page: page, Directory: &d, ShareURL: "/s/capability",
+				Page: page, Directory: &d, ShareURL: "/s/capability", ShareDirectory: page == "shared",
 				Entries: []storage.Entry{
 					{Name: `"<photo> + % árvíz.JPG`, Path: image},
 					{Name: "video + %.mp4", Path: video},

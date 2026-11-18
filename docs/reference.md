@@ -23,6 +23,11 @@ actions. Small screens stack panels and file rows, with wrapping icon actions.
 Colors follow the browser's light/dark preference; no theme preference is stored.
 HTMX refreshes navigation together with the main view. Public shares use a simpler
 read-only shell without management navigation or owner identity metadata.
+The recipient page shows one read-only indicator. Single-file shares use a card
+with the filename, format and size, plus Preview (when supported), Download and
+eligible Cast actions. Folder shares keep a compact table on small screens,
+neutral filename links and folder/file counts; paginated counts explicitly refer
+to the current page. The header and footer do not repeat access restrictions.
 Folder and parent links, breadcrumbs, pagination, directory cards and settings
 links update the main panel through HTMX while retaining the header. Public-share
 folder navigation follows the same pattern within the capability URL. The address
