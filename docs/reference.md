@@ -145,6 +145,19 @@ pagination and HTTP range downloads; rclone crypt decryption works normally.
 Directory shares include descendants and future contents. Links are live views:
 replacing an object at the same path changes what recipients download.
 
+Password-free share pages include Open Graph metadata with the file or folder
+name for link previews in Discord and other apps. JPEG, PNG, GIF, WebP and AVIF
+file shares also advertise the existing inline image URL for a thumbnail.
+Recognized video and audio file shares publish `og:video` or `og:audio` with
+the inline media URL and matching MIME type; video shares use `video.other`.
+Playback support depends on the receiving app and codecs. Video poster images
+are not generated, so apps that require one may show only the title.
+Folder previews use the shared folder's name (or the current subfolder's name
+for a direct subfolder link), without advertising images from its contents.
+Password-protected shares omit this metadata even after unlocking. Preview
+media use the normal share access, expiration and revocation checks; external
+apps may retain previews they have already fetched.
+
 Set **Expires after** to a positive whole number of minutes, or leave it blank
 for no expiration. The management page shows the deadline in UTC. Expired links
 return 404 for browsing, downloads, and password entry, even with cached metadata

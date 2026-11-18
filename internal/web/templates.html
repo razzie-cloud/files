@@ -1,7 +1,15 @@
 {{define "page"}}<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">
 <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"historyCacheSize":0,"attributesToSettle":["class","width","height"],"refreshOnHistoryMiss":true}'>
-<title>{{if .Public}}Shared files{{else}}Files{{end}} · Razzie Cloud</title><link rel="icon" href="/static/razzie-cloud-logo.png"><link rel="stylesheet" href="/static/pico-icons.css"><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/storage-connections.css"><link rel="stylesheet" href="/static/file-actions.css">
+<title>{{if and .Public .SharePreview}}{{.SharePreview.Title}}{{else if .Public}}Shared files{{else}}Files{{end}} · Razzie Cloud</title>
+{{if .Public}}{{with .SharePreview}}<meta property="og:site_name" content="Razzie Cloud Files">
+<meta property="og:type" content="{{if .VideoURL}}video.other{{else}}website{{end}}"><meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}"><meta property="og:url" content="{{.URL}}">
+{{if .VideoURL}}<meta property="og:video" content="{{.VideoURL}}"><meta property="og:video:type" content="{{.VideoType}}">{{end}}
+{{if .AudioURL}}<meta property="og:audio" content="{{.AudioURL}}"><meta property="og:audio:type" content="{{.AudioType}}">{{end}}
+{{if .ImageURL}}<meta property="og:image" content="{{.ImageURL}}"><meta property="og:image:type" content="{{.ImageType}}"><meta property="og:image:alt" content="{{.Title}}">
+<meta name="twitter:card" content="summary_large_image">{{else}}<meta name="twitter:card" content="summary">{{end}}
+{{end}}{{end}}<link rel="icon" href="/static/razzie-cloud-logo.png"><link rel="stylesheet" href="/static/pico-icons.css"><link rel="stylesheet" href="/static/pico.min.css"><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/storage-connections.css"><link rel="stylesheet" href="/static/file-actions.css">
 <script defer src="/static/htmx.min.js"></script><script defer src="/static/app.js"></script>{{if .ShareEnabled}}<script defer src="/static/cast-controller.js"></script><script defer src="/static/cast.js"></script>{{end}}<script defer src="/static/storage-connections.js"></script><script defer src="/static/file-actions.js"></script><link rel="stylesheet" href="/static/account-header.css">{{if .Public}}<link rel="stylesheet" href="/static/public-share.css">{{end}}</head>
 <body><a class="skip-link" href="#main">Skip to content</a><header class="topbar{{if .Public}} public-topbar{{end}}">
 {{if .Public}}<div class="brand-group"><a class="brand" href="{{.LandingOrigin}}/"><img class="brand-mark" src="/static/razzie-cloud-logo.png" width="46" height="46" alt=""><strong>Razzie Cloud</strong></a><span class="service-name">Shared files</span></div>

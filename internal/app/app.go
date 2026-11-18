@@ -67,6 +67,7 @@ type view struct {
 	ShareDirectory                              bool
 	Shares                                      []store.Share
 	ShareURL                                    string
+	SharePreview                                *sharePreview
 	FileAction                                  *fileActionView
 	Folders                                     []folderNode
 }

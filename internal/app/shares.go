@@ -23,6 +23,13 @@ import (
 const shareSessionTTL = 12 * time.Hour
 const shareCookieName = "files_share_session"
 
+type sharePreview struct {
+	Title, Description, URL string
+	ImageURL, ImageType     string
+	VideoURL, VideoType     string
+	AudioURL, AudioType     string
+}
+
 func sameHost(host, origin string) bool {
 	u, err := url.Parse(origin)
 	return err == nil && strings.EqualFold(host, u.Host)
@@ -372,6 +379,35 @@ func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
 		info.Path = ""
 		info.Name = name
 		page.Entries = []storage.Entry{info}
+	}
+	// Publish metadata only for accessible, password-free shares. Even an
+	// unlocked password share must not advertise its contents to crawlers.
+	if v.PasswordHash == "" {
+		preview := &sharePreview{Title: name, URL: s.Config.ShareOrigin + base,
+			Description: "File shared with you via Razzie Cloud Files."}
+		if v.IsDirectory {
+			preview.Description = "Folder shared with you via Razzie Cloud Files."
+			if relative != "" {
+				preview.Title = path.Base(relative)
+				preview.URL += "?path=" + url.QueryEscape(relative)
+			}
+		} else {
+			inlineURL := s.Config.ShareOrigin + base + "/download?inline=1"
+			switch contentType := mediaType(name); contentType {
+			case "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif":
+				preview.ImageURL = inlineURL
+				preview.ImageType = contentType
+			default:
+				if strings.HasPrefix(contentType, "video/") {
+					preview.VideoURL = inlineURL
+					preview.VideoType = contentType
+				} else if strings.HasPrefix(contentType, "audio/") {
+					preview.AudioURL = inlineURL
+					preview.AudioType = contentType
+				}
+			}
+		}
+		page.SharePreview = preview
 	}
 	s.render(w, r, page)
 }
