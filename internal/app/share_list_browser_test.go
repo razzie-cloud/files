@@ -52,7 +52,7 @@ func TestShareListBrowser(t *testing.T) {
 		return browser.Response{Status: w.Code, Body: w.Body.Bytes(), Type: w.Header().Get("Content-Type"), Headers: headers}
 	})
 	defer b.Close()
-	b.Call("Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": `window.issues=[];addEventListener('securitypolicyviolation',e=>issues.push(e.violatedDirective));`})
+	b.Call("Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": `window.issues=[];addEventListener('securitypolicyviolation',e=>issues.push(e.violatedDirective));document.addEventListener('htmx:afterProcessNode',e=>e.target.dataset.browserProcessed='true');`})
 	screenshot := func(name string) {
 		if dir := os.Getenv("FILES_SHARES_SCREENSHOT_DIR"); dir != "" {
 			if err := os.MkdirAll(dir, 0755); err != nil {
@@ -113,8 +113,9 @@ func TestShareListBrowser(t *testing.T) {
 		waitURL(expected)
 	}
 	b.Run(`assert(el('.sidebar [aria-current="page"]').getAttribute('href')==='/shares');assert(el('h1').textContent==='Shares');`)
+	// History can expose restored forms before HTMX has processed them.
 	// Real POSTs remove both active and expired metadata and return to the list.
-	b.Run(`for(let i=0;i<2;i++){el('.share-card button').click();await wait(()=>document.querySelectorAll('.share-card').length===1-i);assert(location.pathname==='/shares','revoke left overview');}assert(el('h2').textContent==='No shares yet');assert(document.documentElement.scrollWidth<=innerWidth);assert(issues.length===0);`)
+	b.Run(`await wait(()=>document.querySelector('.share-card form')?.dataset.browserProcessed==='true');for(let i=0;i<2;i++){el('.share-card button').click();await wait(()=>document.querySelectorAll('.share-card').length===1-i);assert(location.pathname==='/shares','revoke left overview');}assert(el('h2').textContent==='No shares yet');assert(document.documentElement.scrollWidth<=innerWidth);assert(issues.length===0);`)
 	for _, theme := range []string{"light", "dark"} {
 		b.Call("Emulation.setEmulatedMedia", map[string]any{"features": []any{map[string]string{"name": "prefers-color-scheme", "value": theme}}})
 		for _, width := range []int{320, 390, 768, 1440} {

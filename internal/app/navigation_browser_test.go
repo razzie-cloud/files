@@ -85,7 +85,7 @@ func TestPanelNavigationBrowser(t *testing.T) {
 		}
 		headers := map[string]string{
 			"Content-Security-Policy": "default-src 'self'; script-src 'self' https://www.gstatic.com/cv/js/sender/ https://www.gstatic.com/cast/sdk/libs/sender/ https://www.gstatic.com/eureka/clank/; connect-src 'self' https://shared.test; style-src 'self'; img-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
-			"Cache-Control":           "no-store", "Referrer-Policy": "no-referrer",
+			"Cache-Control":           "no-store", "Referrer-Policy": "same-origin",
 		}
 		for key, values := range w.Header() {
 			headers[key] = strings.Join(values, ", ")

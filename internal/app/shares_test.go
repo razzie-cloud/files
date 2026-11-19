@@ -147,17 +147,27 @@ func TestPublicSharingIsolationAndPassword(t *testing.T) {
 	}
 	for _, suffix := range []string{"", "/download?path=file"} {
 		w := request("GET", base+suffix, "", "", nil)
-		if w.Code != 200 || !strings.Contains(w.Body.String(), "requires a password") || strings.Contains(w.Body.String(), "/connections") {
+		if w.Result().Header.Get("Referrer-Policy") != "same-origin" || w.Code != 200 || !strings.Contains(w.Body.String(), "requires a password") || strings.Contains(w.Body.String(), "/connections") {
 			t.Fatal("password gate missing", w.Code, w.Body.String())
 		}
 	}
 	if factory.calls != 0 {
 		t.Fatal("storage opened before password")
 	}
-	if w := request("POST", base+"/unlock", cfg.Origin, "password=secret+password", nil); w.Code != 403 {
-		t.Fatal("cross-origin unlock accepted")
+	for _, origin := range []string{"", "null", cfg.Origin, "https://attacker.example", "http://shared-files.example.com", "https://shared-files.example.com:8443"} {
+		if w := request("POST", base+"/unlock", origin, "password=secret+password", nil); w.Code != 403 {
+			t.Fatal("invalid unlock Origin accepted", origin, w.Code)
+		}
 	}
-	if w := request("POST", base+"/unlock", cfg.ShareOrigin, "password=wrong", nil); w.Code != 403 || len(w.Result().Cookies()) != 0 {
+	duplicate := httptest.NewRequest("POST", base+"/unlock", strings.NewReader("password=secret+password"))
+	duplicate.Header.Add("Origin", cfg.ShareOrigin)
+	duplicate.Header.Add("Origin", cfg.ShareOrigin)
+	duplicateResult := httptest.NewRecorder()
+	h.ServeHTTP(duplicateResult, duplicate)
+	if duplicateResult.Code != 403 {
+		t.Fatal("duplicate unlock Origin accepted", duplicateResult.Code)
+	}
+	if w := request("POST", base+"/unlock", cfg.ShareOrigin, "password=wrong", nil); w.Code != 403 || len(w.Result().Cookies()) != 0 || w.Result().Header.Get("Referrer-Policy") != "same-origin" {
 		t.Fatal("wrong password accepted")
 	}
 	w := request("POST", base+"/unlock", cfg.ShareOrigin, "password=secret+password", nil)
@@ -168,8 +178,7 @@ func TestPublicSharingIsolationAndPassword(t *testing.T) {
 	if !cookie.Secure || !cookie.HttpOnly || cookie.Domain != "" || cookie.Path != "/s/"+id || cookie.SameSite != http.SameSiteLaxMode || cookie.MaxAge != 0 || !cookie.Expires.IsZero() {
 		t.Fatalf("unsafe session cookie: %+v", cookie)
 	}
-	// HTMX submits same-origin XHRs under no-referrer and follows HX-Location
-	// after accepting the cookie; native navigation POSTs can send Origin: null.
+	// HTMX retains its cookie and HX-Location contract alongside native forms.
 	unlock := httptest.NewRequest("POST", base+"/unlock", strings.NewReader("password=secret+password"))
 	unlock.Header.Set("Origin", cfg.ShareOrigin)
 	unlock.Header.Set("Content-Type", "application/x-www-form-urlencoded")

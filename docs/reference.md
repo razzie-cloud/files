@@ -190,8 +190,11 @@ Refreshes reuse this snapshot without database queries; S3 listings/content stay
 live. Missing links are cached for five seconds. Backend errors are not cached,
 and expired snapshots are never served on errors. Management changes clear the
 local cache; other replicas see revocation/deletion/credential changes within
-30 seconds. Downloads already in flight may finish. Responses use `no-store` and
-`no-referrer`, so HTML and passwords are not cached in the browser.
+30 seconds. Downloads already in flight may finish. Responses use `no-store` to
+prevent browser caching of HTML and passwords.
+`Referrer-Policy: same-origin` preserves browser-generated Origins for native
+forms and suppresses referrers to other origins. Same-origin requests may include
+the capability URL as Referer; keep raw capability URLs out of logs.
 
 ## Google Cast
 

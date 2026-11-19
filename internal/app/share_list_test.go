@@ -102,7 +102,7 @@ func TestShareListAndRevoke(t *testing.T) {
 	for _, fragment := range []bool{false, true} {
 		w := shareListRequest(s, "GET", "https://files.test/shares", testOwner, nil, fragment)
 		body := w.Body.String()
-		if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" {
+		if w.Code != 200 || w.Header().Get("Cache-Control") != "no-store" || w.Result().Header.Get("Referrer-Policy") != "same-origin" {
 			t.Fatal(w.Code, w.Header())
 		}
 		for _, want := range []string{"<h1>Shares</h1>", "Workspace &lt;private&gt;", "Photo archive", "Projects/&lt;brand&gt;", "Password required", ">Expired</span>", ">Active</span>", `name="return_to" value="/shares"`, `href="/shares" aria-current="page"`} {

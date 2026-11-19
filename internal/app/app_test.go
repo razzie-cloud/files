@@ -282,7 +282,7 @@ func TestOriginAndIdentityAreRequired(t *testing.T) {
 	for _, test := range []struct {
 		owner, origin string
 		status        int
-	}{{"", "", 401}, {testOwner, "", 403}, {testOwner, "http://attacker.example", 403}} {
+	}{{"", "", 401}, {testOwner, "", 403}, {testOwner, "http://attacker.example", 403}, {testOwner, "null", 403}, {testOwner, "https://127.0.0.2:8082", 403}, {testOwner, "http://127.0.0.2:8083", 403}, {testOwner, "http://127.0.0.2:8082.evil", 403}} {
 		r := httptest.NewRequest("POST", "/connections", strings.NewReader(""))
 		if test.owner != "" {
 			r.Header.Set("X-Auth-Request-User", test.owner)
@@ -296,11 +296,20 @@ func TestOriginAndIdentityAreRequired(t *testing.T) {
 			t.Fatalf("got %d want %d", rec.Code, test.status)
 		}
 	}
-	r := httptest.NewRequest("POST", "/connections", strings.NewReader("field="+strings.Repeat("x", 65537)))
+	r := httptest.NewRequest("POST", "/connections", nil)
+	r.Header.Set("X-Auth-Request-User", testOwner)
+	r.Header.Add("Origin", srv.Config.Origin)
+	r.Header.Add("Origin", srv.Config.Origin)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, r)
+	if rec.Code != 403 {
+		t.Fatal("duplicate Origin accepted", rec.Code)
+	}
+	r = httptest.NewRequest("POST", "/connections", strings.NewReader("field="+strings.Repeat("x", 65537)))
 	r.Header.Set("X-Auth-Request-User", testOwner)
 	r.Header.Set("Origin", srv.Config.Origin)
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
+	rec = httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, r)
 	if rec.Code != 422 {
 		t.Fatalf("oversized settings form returned %d", rec.Code)
