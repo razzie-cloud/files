@@ -280,6 +280,9 @@ func (s *Server) failView(w http.ResponseWriter, r *http.Request, e error, statu
 	case errors.Is(e, store.ErrForbidden):
 		status = 403
 		message = "Administrator required for shared connections."
+	case errors.Is(e, storage.ErrDirectoryNotEmpty):
+		status = 409
+		message = "This folder is not empty. Remove its contents before removing the folder."
 	case errors.Is(e, store.ErrConflict), errors.Is(e, storage.ErrConflict):
 		status = 409
 		message = "Configuration changed, name already exists, or directory is not empty. Refresh and try again."

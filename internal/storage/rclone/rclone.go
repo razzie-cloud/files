@@ -320,6 +320,14 @@ func (h *handle) Remove(ctx context.Context, key string, dir bool) error {
 		return e
 	}
 	if dir {
+		// S3 Rmdir only removes the marker; it does not check for children.
+		entries, e := h.List(ctx, key)
+		if errors.Is(e, storage.ErrTooLarge) || len(entries) > 0 {
+			return storage.ErrDirectoryNotEmpty
+		}
+		if e != nil {
+			return e
+		}
 		return cleanError(h.fs.Rmdir(ctx, key))
 	}
 	o, e := h.fs.NewObject(ctx, key)

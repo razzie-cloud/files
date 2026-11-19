@@ -17,6 +17,7 @@ var ErrNotFound = errors.New("object not found")
 var ErrTooLarge = errors.New("directory or upload exceeds configured limit")
 var ErrInvalidPath = errors.New("invalid relative path")
 var ErrConflict = errors.New("object exists or directory is not empty")
+var ErrDirectoryNotEmpty = errors.New("directory is not empty")
 var ErrCrypto = errors.New("cannot decrypt this directory or file; check crypt settings")
 var ErrMoveIncomplete = errors.New("file copied but source removal failed")
 

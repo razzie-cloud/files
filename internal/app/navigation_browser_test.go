@@ -78,6 +78,8 @@ func TestPanelNavigationBrowser(t *testing.T) {
 		w := httptest.NewRecorder()
 		if u.Path == "/complete" {
 			s.done(w, r, base)
+		} else if request.Method == "POST" && u.Path == base+"/rmdir" {
+			s.operationError(w, r, storage.ErrDirectoryNotEmpty)
 		} else if u.Query().Has("fail") {
 			s.fail(w, r, store.ErrNotFound, 404)
 		} else {
@@ -189,6 +191,23 @@ for (const action of ['Rename','Move']) {
   assert(location.href===oldURL&&window.shell===el('.topbar'),'Cancel navigated');
   assert(window.requests===requestsBeforeCancel,'Cancel sent a navigation request');
 }
+const folderURL=location.href;
+el('[data-delete-action][aria-label="Remove empty folder"]').click();
+await wait(()=>el('#file-action-dialog').open);
+el('#file-action-dialog input[name=confirm]').click();
+el('#file-action-dialog form').requestSubmit();
+await wait(()=>el('#file-action-feedback').textContent.includes('This folder is not empty.'));
+assert(el('#file-action-dialog').open,'failed removal closed the dialog');
+assert(visible(el('#file-action-feedback [role=alert]')),'removal error is hidden');
+assert(document.activeElement===el('#file-action-feedback'),'removal error was not focused');
+assert(el('#file-action-dialog input[name=confirm]').checked,'failed removal lost confirmation');
+assert(location.href===folderURL&&window.shell===el('.topbar'),'failed removal navigated');
+assert(document.querySelector('.file-table [data-delete-action][aria-label="Remove empty folder"]'),'failed removal lost folder');
+`)
+				screenshot(fmt.Sprintf("folder-removal-%s-%d", theme, width))
+				b.Run(`
+await click('Cancel');
+await wait(()=>!el('#file-action-dialog').open);
 el('a[aria-label="Share folder"]').click();
 await wait(()=>location.pathname.endsWith('/shares'));
 assert(window.shell===el('.topbar'),'share navigation replaced document');

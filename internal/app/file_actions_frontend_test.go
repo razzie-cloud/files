@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -9,6 +10,32 @@ import (
 	"github.com/razzie-cloud/files/internal/storage"
 	"github.com/razzie-cloud/files/internal/store"
 )
+
+func TestNonEmptyFolderError(t *testing.T) {
+	s, err := New(config.Config{}, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"", "file-action-feedback"} {
+		r := httptest.NewRequest("POST", "/directories/"+testOwner+"/rmdir", nil)
+		if target != "" {
+			r.Header.Set("HX-Request", "true")
+			r.Header.Set("HX-Target", target)
+		}
+		w := httptest.NewRecorder()
+		s.operationError(w, r, storage.ErrDirectoryNotEmpty)
+		body := w.Body.String()
+		if w.Code != 409 || !strings.Contains(body, `role="alert"`) || !strings.Contains(body, "This folder is not empty. Remove its contents before removing the folder.") {
+			t.Fatalf("missing folder removal error: %d %s", w.Code, body)
+		}
+		if target != "" && (w.Header().Get("HX-Retarget") != "#"+target || strings.Contains(body, "<html")) {
+			t.Fatal("folder removal error must retain the dialog and listing")
+		}
+		if target == "" && !strings.Contains(body, "<html") {
+			t.Fatal("native removal error must render a full page")
+		}
+	}
+}
 
 func TestFileActionControlsAndEscaping(t *testing.T) {
 	s, err := New(config.Config{}, nil, nil, nil, nil)

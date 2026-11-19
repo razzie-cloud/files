@@ -48,6 +48,26 @@ func TestS3AndCryptRoundTrip(t *testing.T) {
 				if e = fs.Mkdir(ctx, "empty"); e != nil {
 					t.Fatal(e)
 				}
+				for _, childIsDir := range []bool{false, true} {
+					if childIsDir {
+						e = fs.Mkdir(ctx, "empty/child")
+					} else {
+						e = fs.Put(ctx, "empty/child", strings.NewReader("keep me"))
+					}
+					if e != nil {
+						t.Fatal(e)
+					}
+					if e = fs.Remove(ctx, "empty", true); !errors.Is(e, storage.ErrDirectoryNotEmpty) {
+						t.Fatalf("non-empty folder removal: %v", e)
+					}
+					entries, err := fs.List(ctx, "empty")
+					if err != nil || len(entries) != 1 || entries[0].Directory != childIsDir {
+						t.Fatalf("failed removal changed folder contents: %+v, %v", entries, err)
+					}
+					if e = fs.Remove(ctx, "empty/child", childIsDir); e != nil {
+						t.Fatal(e)
+					}
+				}
 				content := bytes.Repeat([]byte("private contents + %25 árvíz\n"), 5000)
 				if e = fs.Put(ctx, "file + %25.txt", bytes.NewReader(content)); e != nil {
 					t.Fatal(e)
