@@ -38,6 +38,9 @@ func TestFrontendPublicAndReadOnlyViews(t *testing.T) {
 				t.Fatal(err)
 			}
 			html := page.String()
+			if !strings.Contains(html, `rel="icon" href="/static/razzie-cloud-logo-favicon.png"`) {
+				t.Fatal("page must use the dedicated favicon")
+			}
 			if !strings.Contains(html, `href="http://localhost:9191/" class="brand"`) && !strings.Contains(html, `class="brand" href="http://localhost:9191/"`) {
 				t.Fatal("cloud brand does not link to landing")
 			}
