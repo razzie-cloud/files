@@ -75,7 +75,10 @@ issuer/audience/time, exact method/URI and UUID/name header equality. Cache publ
 keys only until expiry; discovery outages must not extend trust. Keep the verifier
 and tests synchronized with the other S3 app's independent copy. Empty gateway URL
 preserves trusted-proxy mode; public Files capabilities and health probes bypass
-identity. Notes admin APIs also require signed admin=true and the proxy marker.
+identity. All app-owned admin actions use `IsAdmin`/`store.IsAdmin` with signed
+admin=true, including Notes maintenance APIs. Legacy proxy mode never grants
+admin rights. Use ordinary /forward_auth for these apps; proxy markers and
+unsigned role headers must not grant administrative authority.
 
 Broker discovery uses BROKER_TOKEN_FILE / --broker-token-file and optional
 BROKER_CA_FILE / --broker-ca-file. Discovery URLs carry only public client IDs.
