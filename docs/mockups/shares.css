@@ -1,0 +1,24 @@
+/* Shares overview and its creation flow, shared by both preview themes. */
+.share-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,330px),1fr)); gap: 1.4rem; }
+.share-grid>* { min-width: 0; }
+.share-card { overflow-wrap: anywhere; }
+.share-card p { font-size: .9rem; }
+.share-card input { min-width: 0; }
+.page-heading>div { min-width: 0; }
+.page-heading>a { flex-shrink: 0; }
+.empty { text-align: center; padding: 3rem 1.5rem; }
+.empty .folder-tile { margin: 0 auto 1.2rem; }
+.share-card { display: flex; flex-direction: column; margin: 0; }
+.share-card-heading { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: .8rem; }
+.share-card-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1.15rem; line-height: 1.4; }
+.share-card-heading .badge { flex-shrink: 0; margin-top: .15rem; }
+.share-source { font-size: .85rem; }
+.share-source span { color: var(--pico-muted-color); }
+.share-card form { margin-top: auto; padding-top: 1rem; }
+.share-card form button { margin-bottom: 0; }
+
+.brand-group { display: flex; align-items: center; gap: .7rem; }
+.brand-group .service-name { text-decoration: none; }
+@media(max-width:760px) { .brand-group { gap: .1rem; } }
+
+@media(max-width:760px) { .app-layout:has(.shares-heading) { grid-template-rows: auto 1fr; } }

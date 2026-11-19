@@ -31,6 +31,7 @@ starts development dependencies only.
 3. Add a directory using that connection, a bucket, and an optional prefix.
    Choose Plain S3 or rclone crypt, then open the directory to manage files.
 4. Use **Share** beside an entry or **Sharing** in the toolbar to create a public link.
+   Open **Shares** in the sidebar to find and revoke links across all your directories.
 
 For disposable storage, the parent repository also provides an
 [S3 demo](https://github.com/razzie-cloud/.github/blob/master/docs/development.md#disposable-s3-demo).

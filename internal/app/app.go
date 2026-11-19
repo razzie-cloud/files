@@ -65,6 +65,8 @@ type view struct {
 	ShareEnabled                                bool
 	Public                                      bool
 	ShareDirectory                              bool
+	ShareDirectories                            map[string]string
+	Now                                         time.Time
 	Shares                                      []store.Share
 	ShareURL                                    string
 	SharePreview                                *sharePreview
@@ -140,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux.Handle("GET /static/", logging.Route("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static()))))
 	handle("GET /{$}", s.home)
+	handle("GET /shares", s.shareList)
 	handle("GET /connections", s.connections)
 	handle("GET /connections/new", s.connections)
 	handle("GET /connections/{id}/edit", s.connections)
@@ -242,6 +245,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, v view) {
 	v.Admin = store.IsAdmin(r.Context())
 	v.UploadLimit = s.Config.MaxUploadBytes
 	v.UploadFileLimit = maxUploadFiles
+	v.Now = time.Now()
 	v.ShareEnabled = s.Config.ShareOrigin != ""
 	v.Public = v.ShareEnabled && sameHost(r.Host, s.Config.ShareOrigin)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

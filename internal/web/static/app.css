@@ -448,3 +448,14 @@ input[role="switch"]:checked { --pico-color: var(--pico-primary-inverse); }
 /* Shared cloud home and app home are separate navigation targets. */
 .brand-group { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
 .brand-group .service-name { text-decoration: none; white-space: nowrap; }
+
+.share-card { display: flex; flex-direction: column; margin: 0; }
+.share-card-heading { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: .8rem; }
+.share-card-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1.15rem; line-height: 1.4; }
+.share-card-heading .badge { flex-shrink: 0; margin-top: .15rem; }
+.share-source { font-size: .85rem; }
+.share-source span { color: var(--pico-muted-color); }
+.share-card form { margin-top: auto; padding-top: 1rem; }
+.share-card form button { margin-bottom: 0; }
+
+@media(max-width:760px) { .app-layout:has(.shares-heading) { grid-template-rows: auto 1fr; } }

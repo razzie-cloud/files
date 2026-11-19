@@ -56,6 +56,8 @@ func TestPanelNavigationBrowser(t *testing.T) {
 		switch u.Path {
 		case "/":
 			v.Page, v.Directory, v.Directories = "home", nil, []store.Directory{*d}
+		case "/shares":
+			v.Page, v.Directory = "share-list", nil
 		case "/connections":
 			v.Page, v.Directory, v.Connections = "connections", nil, []store.Connection{{ID: testOwner, Name: "Storage"}}
 		case "/connections/new":
@@ -194,6 +196,10 @@ el('.page-heading a[hx-boost]').click();
 await wait(()=>!location.pathname.endsWith('/shares'));
 el('nav[aria-label="Directory settings"] a').click();
 await wait(()=>location.pathname.endsWith('/edit'));
+el('nav[aria-label=Primary] a[href="/shares"]').click();
+await wait(()=>location.pathname==='/shares');
+assert(el('.sidebar [aria-current="page"]').getAttribute('href')==='/shares','Shares active state');
+assert(el('h1').textContent==='Shares','Shares view');
 el('nav[aria-label=Primary] a[href="/connections"]').click();
 await wait(()=>location.pathname==='/connections');
 el('#add-connection').click();

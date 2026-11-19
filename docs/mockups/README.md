@@ -1,5 +1,49 @@
 # Files design concept
 
+## Shares overview
+
+[Light](shares.html) · [Dark](dark/shares.html) ·
+[Empty](shares-empty.html) · [Dark empty](dark/shares-empty.html) ·
+[Create share](share-create.html) · [Dark creation](dark/share-create.html)
+
+**Shares** is available in every authenticated preview’s sidebar. The overview
+shows links across Workspace, Photo archive and Personal vault, with source
+directory, file/folder scope, password requirement and Active/Expired status.
+Active links open a recipient preview in a new tab; expired links remain visible
+for cleanup. Revoke replaces only its card with an authored simulation receipt;
+no real capability is changed. Empty state and Browse directories explain how
+to create a link. Existing file/folder Share actions still open the separate
+creation fixture, which links back to the overview. All mutations are local
+static GET fixtures with no submitted input values.
+
+The production service implements the overview at `/shares`, with owner-scoped
+metadata and real revocation. These previews remain independent sample data.
+
+Screenshots: [overview desktop](shares-desktop.png),
+[overview mobile](shares-mobile.png), [dark overview](dark/shares-desktop.png),
+[dark mobile](dark/shares-mobile.png), [empty](shares-empty-desktop.png),
+[dark empty mobile](dark/shares-empty-mobile.png), and
+[creation](share-create-desktop.png). Each sharing screen has desktop/mobile
+images in both themes; affected primary sidebar screenshots were refreshed.
+
+Verification: Chromium checked 112 full-page layouts in both themes at
+320/390/768/1440 pixels. Checks covered headings, assets, page overflow, sidebar
+links, selected state, account/header and card/badge alignment, theme round trips,
+simulated revocation, creation and input privacy. All 1008 observed requests were
+local GETs with no submitted values or failed responses; no unexpected browser
+or CSP errors occurred. Representative desktop/mobile screenshots were visually
+reviewed. All 892 local HTML references resolve in their document context.
+
+Production verification passed `gofmt`, `go build ./...`, `go vet ./...`,
+`go test ./...` and `go test -race ./...` in Files. The maintained Shares browser
+fixture uses real handlers with disposable owner-scoped metadata and checks
+populated/empty/creation states in both themes at four widths, real revoke POSTs,
+direct links and fresh Back/Forward restoration. The existing panel-navigation
+browser regression also passed. PostgreSQL integration tests skipped because
+`TEST_DATABASE_URL` was unset; in-memory S3 tests ran. Production screenshots
+were kept separate from these mockups. No live S3/authentication, publication or
+deployment ran; temporary browser fixtures exited after verification.
+
 ## Shared recipient layout proposal
 
 [Single file](public-file.html) · [Dark single file](dark/public-file.html) ·
@@ -183,7 +227,8 @@ Serve the **Razzie Cloud parent directory** with
 | Connections | [connections.html](connections.html) | Connection cards with Add/Edit dialogs |
 | First connection | [connections-empty.html](connections-empty.html) | Inline setup when no connections exist |
 | Add directory | [directory.html](directory.html) | Grouped setup, encryption disclosure, explanatory column |
-| Sharing | [shares.html](shares.html) | Read-only capability link form |
+| Shares | [shares.html](shares.html), [empty](shares-empty.html) | Links across directories, expiry status and simulated revocation |
+| Create share | [share-create.html](share-create.html) | Read-only capability link form |
 | Recipient view | [public-file.html](public-file.html), [public.html](public.html) | Single-file card and folder table with one access label |
 
 [Overview screenshot](index-desktop.png) · [File browser screenshot](browse-desktop.png)

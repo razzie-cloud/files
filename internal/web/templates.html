@@ -19,7 +19,8 @@
 {{define "content"}}
 {{if .Public}}<div class="public-workspace">{{template "view" .}}{{template "footer" .}}</div>
 {{else}}<div class="app-layout"><aside class="sidebar"><section><p class="eyebrow">Workspace</p><nav aria-label="Primary"><ul>
-<li><a href="/"{{if or (eq .Page "home") (eq .Page "browse") (eq .Page "directory-form") (eq .Page "shares")}} aria-current="page"{{end}} hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{template "icon-grid"}}All directories</a></li>
+<li><a href="/"{{if or (eq .Page "home") (eq .Page "browse") (eq .Page "directory-form")}} aria-current="page"{{end}} hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{template "icon-grid"}}All directories</a></li>
+{{if .ShareEnabled}}<li><a href="/shares"{{if or (eq .Page "share-list") (eq .Page "shares")}} aria-current="page"{{end}} hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{template "icon-link"}}Shares</a></li>{{end}}
 <li><a href="/connections"{{if eq .Page "connections"}} aria-current="page"{{end}} hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{template "icon-server"}}Connections</a></li>
 </ul></nav></section>
 {{if .Directory}}{{if .Directory.ID}}<section><p class="eyebrow">Current directory</p><p class="sidebar-directory">{{template "icon-folder"}} {{.Directory.Name}}</p><nav aria-label="Directory settings"><ul><li><a href="/directories/{{.Directory.ID}}/edit" hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{template "icon-settings"}}Directory settings</a></li></ul></nav></section>{{end}}{{end}}
@@ -89,10 +90,11 @@
 <label>Share type<select name="kind"><option value="directory" {{if .ShareDirectory}}selected{{end}}>Directory and its contents</option><option value="file" {{if not .ShareDirectory}}selected{{end}}>Single file</option></select></label>
 <label>Password (optional)<input type="password" name="password" autocomplete="new-password" maxlength="72"></label>
 <label>Expires after (minutes, optional)<input type="number" name="expires_in_minutes" min="1" step="1" placeholder="Never"></label><small>Leave blank for no expiration.</small><button>Create share link</button></form></article><aside class="form-help"><div class="folder-tile">{{template "icon-shield"}}</div><h2>Sharing stays read-only.</h2><p>Recipients can browse and download this file or folder. They cannot change your files or access your other directories.</p><h2>You’re in control.</h2><p>Add a password, choose an expiry, and revoke access when you’re done.</p></aside></div>
-<h2 class="block-title">Active shares</h2><div class="share-grid">{{range .Shares}}<article><h2>{{if .Path}}{{.Path}}{{else}}Entire directory{{end}}</h2><p>{{if .IsDirectory}}Directory{{else}}File{{end}} · {{if .PasswordHash}}Password required{{else}}Anyone with the link{{end}}</p>
-<p>{{if .ExpiresAt}}Expires <time datetime="{{.ExpiresAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.ExpiresAt.UTC.Format "2006-01-02 15:04:05"}} UTC</time>{{else}}No expiration{{end}}</p>
-<label>Share link<input readonly value="{{$.ShareURL}}/s/{{.ID}}"></label><a href="{{$.ShareURL}}/s/{{.ID}}" target="_blank" rel="noreferrer">Open share</a>
-<form method="post" action="/directories/{{$.Directory.ID}}/shares/{{.ID}}/remove" hx-post="/directories/{{$.Directory.ID}}/shares/{{.ID}}/remove" hx-target="#main"><button class="secondary">Revoke share</button></form></article>{{else}}<p class="muted">No active shares.</p>{{end}}</div>
+<div class="section-heading"><h2>Existing shares</h2><a href="/shares" hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">View all shares</a></div>{{template "share-cards" .}}
+{{end}}
+{{if eq .Page "share-list"}}
+<div class="page-heading shares-heading"><div><small>SHARING</small><h1>Shares</h1><p>Find and manage your share links across all directories, including expired links. To create a link, use Share on a file or folder.</p></div><a href="/" hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">Browse directories</a></div>
+{{if .Shares}}{{template "share-cards" .}}{{else}}<article class="empty"><div class="folder-tile">{{template "icon-link"}}</div><h2>No shares yet</h2><p>Share a file or folder from a directory. Your links will appear here.</p><a href="/" hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">Browse directories</a></article>{{end}}
 {{end}}
 {{if eq .Page "share-password"}}
 <article class="form-card share-unlock"><div class="folder-tile">{{template "icon-lock"}}</div><h1>This share requires a password</h1>{{if .Message}}<p role="alert">{{.Message}}</p>{{end}}<form method="post" action="{{.ShareURL}}/unlock" hx-post="{{.ShareURL}}/unlock" hx-target="#main"><label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="72"></label><button>Open share</button></form></article>
@@ -118,6 +120,16 @@
 {{end}}
 {{end}}
 {{end}}
+{{end}}
+
+{{define "share-cards"}}
+<div class="share-grid">{{range .Shares}}<article class="share-card">
+<div class="share-card-heading"><h2>{{if .Path}}{{.Path}}{{else}}Entire directory{{end}}</h2><span class="badge{{if not (.Expired $.Now)}} green{{end}}">{{if .Expired $.Now}}Expired{{else}}Active{{end}}</span></div>
+{{if eq $.Page "share-list"}}<p class="share-source"><span>In directory</span> <a href="/directories/{{.DirectoryID}}" hx-boost="true" hx-target="#main" hx-swap="innerHTML show:window:top" hx-sync="#main:replace">{{with index $.ShareDirectories .DirectoryID}}{{.}}{{else}}Directory{{end}}</a></p>{{end}}
+<p>{{if .IsDirectory}}Folder{{else}}File{{end}} · {{if .PasswordHash}}Password required{{else}}Anyone with the link{{end}}</p>
+<p>{{if .ExpiresAt}}{{if .Expired $.Now}}Expired{{else}}Expires{{end}} <time datetime="{{.ExpiresAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.ExpiresAt.UTC.Format "2006-01-02 15:04:05"}} UTC</time>{{else}}No expiration{{end}}</p>
+<label>Share link<input readonly value="{{$.ShareURL}}/s/{{.ID}}"></label>{{if not (.Expired $.Now)}}<a href="{{$.ShareURL}}/s/{{.ID}}" target="_blank" rel="noreferrer">Open share</a>{{end}}
+<form method="post" action="/directories/{{.DirectoryID}}/shares/{{.ID}}/remove" hx-post="/directories/{{.DirectoryID}}/shares/{{.ID}}/remove" hx-target="#main">{{if eq $.Page "share-list"}}<input type="hidden" name="return_to" value="/shares">{{end}}<button class="secondary">Revoke share</button></form></article>{{else}}<p class="muted">No shares in this directory.</p>{{end}}</div>
 {{end}}
 
 {{define "document-preview"}}<!doctype html>

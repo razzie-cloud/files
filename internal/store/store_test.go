@@ -42,6 +42,32 @@ func TestOwnershipRevisionsAndPrefixes(t *testing.T) {
 	if list, err := repo.Shares(ctx, bob, d.ID); err != nil || len(list) != 0 {
 		t.Fatal("cross-owner share list", list, err)
 	}
+	if list, err := repo.Shares(ctx, bob, ""); err != nil || len(list) != 0 {
+		t.Fatal("cross-owner all-shares list", list, err)
+	}
+	second := d
+	second.ID, second.Name, second.Prefix = "", "Second share directory", "second-shares"
+	if err := repo.SaveDirectory(ctx, &second); err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-time.Hour)
+	secondShare := store.Share{Owner: alice, DirectoryID: second.ID, Path: "expired.txt", ExpiresAt: &past}
+	if err := repo.CreateShare(ctx, &secondShare); err != nil {
+		t.Fatal(err)
+	}
+	if list, err := repo.Shares(ctx, alice, ""); err != nil || len(list) != 2 || list[0].ID != secondShare.ID || list[1].ID != share.ID {
+		t.Fatal("all-shares list must span directories, include expired links and sort newest first", list, err)
+	}
+	if list, err := repo.Shares(ctx, alice, d.ID); err != nil || len(list) != 1 || list[0].ID != share.ID {
+		t.Fatal("directory filter changed", list, err)
+	}
+	if err := repo.RemoveShare(ctx, alice, second.ID, secondShare.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RemoveDirectory(ctx, alice, second.ID, second.Revision); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := repo.RemoveShare(ctx, bob, d.ID, share.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal("cross-owner share deletion", err)
 	}

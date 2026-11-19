@@ -139,8 +139,12 @@ shared-files.example.com {
 
 Use **Share** beside a file/folder, or **Sharing** in the directory toolbar.
 Leave the path empty and select Directory to share the entire mapped directory.
-Owners can list/copy links and revoke them from this page, including on read-only
-connections. Public pages allow read-only browsing, downloading, previewing, and casting, with
+Open **Shares** in the sidebar (`/shares`) to find links across all your directories,
+including expired links. Cards show the directory, path, password requirement and
+expiration. Copy the link, open an active share, or revoke it without leaving the
+overview. The directory sharing page also keeps its own list and links to the
+overview. Both lists work on read-only connections and use saved metadata without
+opening S3. Public pages allow read-only browsing, downloading, previewing, and casting, with
 pagination and HTTP range downloads; rclone crypt decryption works normally.
 Directory shares include descendants and future contents. Links are live views:
 replacing an object at the same path changes what recipients download.

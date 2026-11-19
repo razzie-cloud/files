@@ -38,8 +38,16 @@ func scanShare(row scanner) (v Share, err error) {
 	err = row.Scan(&v.ID, &v.Owner, &v.DirectoryID, &v.Path, &v.IsDirectory, &v.PasswordHash, &v.SessionKey, &v.CreatedAt, &v.ExpiresAt)
 	return v, translate(err)
 }
+
+// Shares lists one directory’s links, or all of the owner’s links when directory is empty.
 func (s *Store) Shares(ctx context.Context, owner, directory string) ([]Share, error) {
-	rows, err := s.DB.QueryContext(ctx, "SELECT "+shareColumns+" FROM shares WHERE owner_user_id=$1 AND directory_id=$2 ORDER BY created_at DESC", owner, directory)
+	query := "SELECT " + shareColumns + " FROM shares WHERE owner_user_id=$1"
+	args := []any{owner}
+	if directory != "" {
+		query += " AND directory_id=$2"
+		args = append(args, directory)
+	}
+	rows, err := s.DB.QueryContext(ctx, query+" ORDER BY created_at DESC, id", args...)
 	if err != nil {
 		return nil, err
 	}

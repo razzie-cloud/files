@@ -46,6 +46,31 @@ func shareExpiration(value string, now time.Time) (*time.Time, error) {
 	expires := now.Add(time.Duration(minutes) * time.Minute)
 	return &expires, nil
 }
+
+// shareList reads only owner-scoped metadata; no S3 connection is needed.
+func (s *Server) shareList(w http.ResponseWriter, r *http.Request) {
+	if s.Config.ShareOrigin == "" {
+		http.NotFound(w, r)
+		return
+	}
+	owner := user(r).ID
+	shares, err := s.Repo.Shares(r.Context(), owner, "")
+	if err != nil {
+		s.fail(w, r, err, 500)
+		return
+	}
+	directories, err := s.Repo.Directories(r.Context(), owner)
+	if err != nil {
+		s.fail(w, r, err, 500)
+		return
+	}
+	names := make(map[string]string, len(directories))
+	for _, d := range directories {
+		names[d.ID] = d.Name
+	}
+	s.render(w, r, view{Page: "share-list", Shares: shares, ShareDirectories: names, ShareURL: s.Config.ShareOrigin})
+}
+
 func (s *Server) shareForm(w http.ResponseWriter, r *http.Request) {
 	if s.Config.ShareOrigin == "" {
 		http.NotFound(w, r)
@@ -159,7 +184,11 @@ func (s *Server) removeShare(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	s.done(w, r, "/directories/"+d.ID+"/shares")
+	destination := "/directories/" + d.ID + "/shares"
+	if r.PostForm.Get("return_to") == "/shares" {
+		destination = "/shares"
+	}
+	s.done(w, r, destination)
 }
 
 func (s *Server) publicHandler() http.Handler {

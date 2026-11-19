@@ -35,6 +35,7 @@ func (d Directory) Writable(c Connection) bool { return c.AccessMode == "writabl
 
 type Repository interface {
 	Ping(context.Context) error
+	// Shares lists owner-scoped links; an empty directory selects all directories.
 	Shares(context.Context, string, string) ([]Share, error)
 	PublicShare(context.Context, string) (Share, error)
 	CreateShare(context.Context, *Share) error
